@@ -1,0 +1,32 @@
+export const TextureKeys = {
+  PLAYER: 'player',
+  NPC_BLACKSMITH: 'npc_blacksmith',
+  NPC_INNKEEPER: 'npc_innkeeper',
+  NPC_MERCHANT: 'npc_merchant',
+  NPC_FARMER: 'npc_farmer',
+  NPC_GUARD: 'npc_guard',
+  NPC_HERBALIST: 'npc_herbalist',
+  BUILDING_FORGE: 'building_forge',
+  BUILDING_INN: 'building_inn',
+  BUILDING_MARKET: 'building_market',
+  BUILDING_FARM: 'building_farm',
+  BUILDING_GUARD: 'building_guard',
+  BUILDING_HERBS: 'building_herbs',
+  TILE_GRASS: 'grass',
+  TILE_PATH: 'path',
+  ENEMY_WOLF: 'enemy_wolf',
+  BOSS_SHADOW_WOLF: 'boss_shadow_wolf',
+  BOSS_CRYSTAL_GOLEM: 'boss_crystal_golem',
+  BOSS_BLIGHT_WRAITH: 'boss_blight_wraith',
+  ITEM_SWORD: 'item_sword',
+  EFFECT_BLIGHT: 'effect_blight',
+} as const;
+
+export const NPC_TEXTURE_MAP: Record<string, string> = {
+  blacksmith_erik: TextureKeys.NPC_BLACKSMITH,
+  innkeeper_rose: TextureKeys.NPC_INNKEEPER,
+  merchant_anna: TextureKeys.NPC_MERCHANT,
+  farmer_thomas: TextureKeys.NPC_FARMER,
+  guard_marcus: TextureKeys.NPC_GUARD,
+  herbalist_willow: TextureKeys.NPC_HERBALIST,
+};
