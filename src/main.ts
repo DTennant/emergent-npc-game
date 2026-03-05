@@ -3,6 +3,9 @@ import { BootScene } from './scenes/BootScene';
 import { WorldScene } from './scenes/WorldScene';
 import { DialogueScene } from './scenes/DialogueScene';
 import { HUDScene } from './scenes/HUDScene';
+import { InventoryScene } from './scenes/InventoryScene';
+import { DungeonScene } from './scenes/DungeonScene';
+import { SettingsScene } from './scenes/SettingsScene';
 import { GAME_WIDTH, GAME_HEIGHT } from './config';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -11,16 +14,32 @@ const config: Phaser.Types.Core.GameConfig = {
   height: GAME_HEIGHT,
   parent: 'game-container',
   backgroundColor: '#1a1a2e',
-  pixelArt: true,
+  render: {
+    antialias: false,
+    pixelArt: true,
+    roundPixels: true,
+  },
+  physics: {
+    default: 'arcade',
+    arcade: {
+      gravity: { x: 0, y: 0 },
+      debug: false,
+    },
+  },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, WorldScene, DialogueScene, HUDScene],
+  dom: {
+    createContainer: true,
+  },
+  scene: [BootScene, WorldScene, DialogueScene, HUDScene, InventoryScene, DungeonScene, SettingsScene],
 };
 
 new Phaser.Game(config);
 
 console.log('🌍 Emergent NPC World — Thornwick Village');
 console.log('WASD to move, E to interact with NPCs');
-console.log('Set OpenAI API key in browser console: localStorage.setItem("openai_api_key", "sk-...")');
+console.log('Set API key: localStorage.setItem("openai_api_key", "sk-...")');
+console.log('For LiteLLM: localStorage.setItem("llm_base_url", "http://localhost:4000/v1")');
+console.log('Change model: localStorage.setItem("llm_model", "gpt-4o-mini")');

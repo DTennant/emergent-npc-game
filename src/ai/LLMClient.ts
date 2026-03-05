@@ -1,40 +1,50 @@
-import { MemoryContext } from '../memory/types';
+import { MemoryContext, LLMResponse } from '../memory/types';
 
 interface LLMRequest {
   messages: { role: string; content: string }[];
-  resolve: (response: string) => void;
+  resolve: (response: LLMResponse) => void;
   reject: (error: Error) => void;
 }
 
-const FALLBACK_RESPONSES: Record<string, string[]> = {
+const FALLBACK_DIALOGUES: Record<string, string[]> = {
   greeting: [
-    "Good day to you, traveler.",
-    "Ah, hello there. What brings you here?",
-    "Welcome! Haven't seen you around much.",
-    "Well met, friend.",
+    'Good day to you, traveler.',
+    'Ah, hello there. What brings you here?',
+    'Welcome! Haven\'t seen you around much.',
+    'Well met, friend.',
   ],
   busy: [
-    "I'm a bit occupied right now, come back later.",
-    "Can't talk long, got work to do.",
-    "Make it quick, I've got things to attend to.",
+    'I\'m a bit occupied right now, come back later.',
+    'Can\'t talk long, got work to do.',
+    'Make it quick, I\'ve got things to attend to.',
   ],
   friendly: [
-    "It's always good to see you! How have you been?",
-    "Ah, my favorite visitor! What can I do for you?",
-    "I was just thinking about you. Strange, isn't it?",
+    'It\'s always good to see you! How have you been?',
+    'Ah, my favorite visitor! What can I do for you?',
+    'I was just thinking about you. Strange, isn\'t it?',
   ],
   suspicious: [
-    "What do you want now?",
-    "I've got my eye on you...",
-    "Hmm. State your business.",
+    'What do you want now?',
+    'I\'ve got my eye on you...',
+    'Hmm. State your business.',
   ],
   default: [
-    "Interesting...",
-    "I see. Tell me more.",
-    "That's something to think about.",
-    "Life in Thornwick keeps surprising me.",
+    'Interesting...',
+    'I see. Tell me more.',
+    'That\'s something to think about.',
+    'Life in Thornwick keeps surprising me.',
   ],
 };
+
+function makeFallbackResponse(dialogue: string): LLMResponse {
+  return {
+    dialogue,
+    internal_thought: '',
+    mood_change: 0,
+    action: null,
+    memory_to_store: dialogue,
+  };
+}
 
 export class LLMClient {
   private apiKey: string | null = null;
@@ -46,9 +56,16 @@ export class LLMClient {
   private activeRequests = 0;
 
   constructor() {
-    // Try to load API key from localStorage
     if (typeof window !== 'undefined') {
       this.apiKey = localStorage.getItem('openai_api_key');
+      const storedBaseUrl = localStorage.getItem('llm_base_url');
+      if (storedBaseUrl) {
+        this.baseUrl = storedBaseUrl.replace(/\/+$/, '');
+      }
+      const storedModel = localStorage.getItem('llm_model');
+      if (storedModel) {
+        this.model = storedModel;
+      }
     }
   }
 
@@ -56,6 +73,46 @@ export class LLMClient {
     this.apiKey = key;
     if (typeof window !== 'undefined') {
       localStorage.setItem('openai_api_key', key);
+    }
+  }
+
+  setBaseUrl(url: string): void {
+    this.baseUrl = url.replace(/\/+$/, '');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('llm_base_url', this.baseUrl);
+    }
+  }
+
+  setModel(model: string): void {
+    this.model = model;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('llm_model', model);
+    }
+  }
+
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  getModel(): string {
+    return this.model;
+  }
+
+  reloadConfig(): void {
+    if (typeof window !== 'undefined') {
+      this.apiKey = localStorage.getItem('openai_api_key');
+      const storedBaseUrl = localStorage.getItem('llm_base_url');
+      if (storedBaseUrl) {
+        this.baseUrl = storedBaseUrl.replace(/\/+$/, '');
+      } else {
+        this.baseUrl = 'https://api.openai.com/v1';
+      }
+      const storedModel = localStorage.getItem('llm_model');
+      if (storedModel) {
+        this.model = storedModel;
+      } else {
+        this.model = 'gpt-4o-mini';
+      }
     }
   }
 
@@ -74,7 +131,7 @@ export class LLMClient {
     memoryContext: MemoryContext,
     playerMessage: string,
     worldContext: string
-  ): Promise<string> {
+  ): Promise<LLMResponse> {
     if (!this.hasApiKey()) {
       return this.getFallbackResponse(memoryContext);
     }
@@ -135,11 +192,18 @@ WORLD CONTEXT: ${worldContext}`;
       }
     }
 
-    prompt += `\n\nRespond in character. Keep responses under 100 words. Be natural, not theatrical.`;
+    prompt += `\n\nRespond in character. Keep responses under 100 words. Be natural, not theatrical.
+
+Respond with a JSON object containing:
+- "dialogue": What you say out loud (1-3 sentences, in character)
+- "internal_thought": What you're privately thinking
+- "mood_change": How this affects your mood (-1.0 to 1.0, 0 = neutral)
+- "action": A physical action you take (or null)
+- "memory_to_store": What you'll remember about this interaction`;
     return prompt;
   }
 
-  private getFallbackResponse(context: MemoryContext): string {
+  private getFallbackResponse(context: MemoryContext): LLMResponse {
     let category = 'greeting';
 
     if (context.relationship) {
@@ -153,13 +217,14 @@ WORLD CONTEXT: ${worldContext}`;
       }
     }
 
-    const responses = FALLBACK_RESPONSES[category];
-    return responses[Math.floor(Math.random() * responses.length)];
+    const dialogues = FALLBACK_DIALOGUES[category];
+    const dialogue = dialogues[Math.floor(Math.random() * dialogues.length)];
+    return makeFallbackResponse(dialogue);
   }
 
   private enqueueRequest(
     messages: { role: string; content: string }[]
-  ): Promise<string> {
+  ): Promise<LLMResponse> {
     return new Promise((resolve, reject) => {
       this.queue.push({ messages, resolve, reject });
       this.processQueue();
@@ -190,9 +255,11 @@ WORLD CONTEXT: ${worldContext}`;
 
   private async callAPI(
     messages: { role: string; content: string }[]
-  ): Promise<string> {
+  ): Promise<LLMResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      const url = `${this.baseUrl}/chat/completions`;
+      console.log(`[LLM] POST ${url} model=${this.model}`);
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -201,22 +268,42 @@ WORLD CONTEXT: ${worldContext}`;
         body: JSON.stringify({
           model: this.model,
           messages,
-          max_tokens: 200,
+          max_tokens: 400,
           temperature: 0.8,
+          response_format: { type: 'json_object' },
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        const errBody = await response.text();
+        throw new Error(`API error: ${response.status} — ${errBody}`);
       }
 
       const data = await response.json();
-      return data.choices?.[0]?.message?.content ?? 'I have nothing to say.';
+      const content = data.choices?.[0]?.message?.content ?? '';
+
+      return this.parseLLMResponse(content);
     } catch (error) {
       console.error('LLM API error:', error);
-      return FALLBACK_RESPONSES.default[
-        Math.floor(Math.random() * FALLBACK_RESPONSES.default.length)
-      ];
+      console.warn('LLM call failed, using fallback response');
+      const dialogues = FALLBACK_DIALOGUES.default;
+      const dialogue = dialogues[Math.floor(Math.random() * dialogues.length)];
+      return makeFallbackResponse(dialogue);
+    }
+  }
+
+  private parseLLMResponse(content: string): LLMResponse {
+    try {
+      const parsed = JSON.parse(content);
+      return {
+        dialogue: parsed.dialogue ?? content,
+        internal_thought: parsed.internal_thought ?? '',
+        mood_change: Math.max(-1, Math.min(1, parsed.mood_change ?? 0)),
+        action: parsed.action ?? null,
+        memory_to_store: parsed.memory_to_store ?? parsed.dialogue ?? content,
+      };
+    } catch {
+      return makeFallbackResponse(content || 'I have nothing to say.');
     }
   }
 }

@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { WorldState } from '../world/WorldState';
 import { LLMClient } from '../ai/LLMClient';
+import { ITEMS } from '../inventory/types';
 import { EventBus, Events } from '../world/EventBus';
-import { GAME_WIDTH } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 
 interface HUDData {
   worldState: WorldState;
@@ -17,6 +18,7 @@ export class HUDScene extends Phaser.Scene {
   private apiStatus!: Phaser.GameObjects.Text;
   private notificationText!: Phaser.GameObjects.Text;
   private notificationTimer = 0;
+  private equippedWeaponText!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: 'HUDScene' });
@@ -37,6 +39,7 @@ export class HUDScene extends Phaser.Scene {
       color: '#ffcc00',
       stroke: '#000000',
       strokeThickness: 2,
+      resolution: window.devicePixelRatio,
     });
     this.timeText.setDepth(101);
 
@@ -46,6 +49,7 @@ export class HUDScene extends Phaser.Scene {
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 2,
+      resolution: window.devicePixelRatio,
     });
     this.dayText.setDepth(101);
 
@@ -56,20 +60,29 @@ export class HUDScene extends Phaser.Scene {
       color: hasApi ? '#44ff44' : '#ffaa00',
       stroke: '#000000',
       strokeThickness: 2,
+      resolution: window.devicePixelRatio,
     });
     this.apiStatus.setOrigin(1, 0);
     this.apiStatus.setDepth(101);
 
-    // Controls hint
     this.add
-      .text(GAME_WIDTH / 2, 4, 'WASD: Move | E: Talk | ESC: Close', {
+      .text(GAME_WIDTH / 2, 4, 'WASD: Move | E: Talk | I: Inventory | ESC: Close', {
         fontSize: '10px',
         color: '#888888',
         stroke: '#000000',
         strokeThickness: 1,
+        resolution: window.devicePixelRatio,
       })
       .setOrigin(0.5, 0)
       .setDepth(101);
+
+    this.equippedWeaponText = this.add.text(10, GAME_HEIGHT - 24, 'Weapon: (none)', {
+      fontSize: '11px',
+      color: '#aaaaaa',
+      stroke: '#000000',
+      strokeThickness: 2,
+      resolution: window.devicePixelRatio,
+    }).setDepth(101);
 
     // Notification area
     this.notificationText = this.add.text(GAME_WIDTH / 2, 40, '', {
@@ -79,18 +92,51 @@ export class HUDScene extends Phaser.Scene {
       strokeThickness: 2,
       backgroundColor: '#00000088',
       padding: { x: 8, y: 4 },
+      resolution: window.devicePixelRatio,
     });
     this.notificationText.setOrigin(0.5);
     this.notificationText.setDepth(101);
     this.notificationText.setVisible(false);
 
-    // Listen for events
+    const settingsBtn = this.add.text(GAME_WIDTH - 80, 4, '⚙️', {
+      fontSize: '16px',
+      resolution: window.devicePixelRatio,
+    });
+    settingsBtn.setDepth(101);
+    settingsBtn.setInteractive({ useHandCursor: true });
+    settingsBtn.on('pointerdown', () => {
+      if (!this.scene.isActive('SettingsScene')) {
+        this.scene.launch('SettingsScene', { onClose: () => {} });
+      }
+    });
+
     EventBus.on(Events.SHOW_NOTIFICATION, (data: { text: string }) => {
       this.showNotification(data.text);
     });
 
     EventBus.on(Events.DIALOGUE_START, (data: { npc: { persona: { name: string } } }) => {
       this.showNotification(`Speaking with ${data.npc.persona.name}...`);
+    });
+
+    EventBus.on(Events.INVENTORY_CHANGE, (data: { equipped: Record<string, string | null> }) => {
+      const weaponId = data.equipped.weapon;
+      if (weaponId && ITEMS[weaponId]) {
+        const def = ITEMS[weaponId];
+        const dmg = def.stats?.damage ? ` (dmg: ${def.stats.damage})` : '';
+        this.equippedWeaponText.setText(`Weapon: ${def.name}${dmg}`);
+        this.equippedWeaponText.setColor('#ffcc00');
+      } else {
+        this.equippedWeaponText.setText('Weapon: (none)');
+        this.equippedWeaponText.setColor('#aaaaaa');
+      }
+    });
+
+    EventBus.on(Events.ITEM_ACQUIRED, (data: { itemId: string; quantity: number }) => {
+      const def = ITEMS[data.itemId];
+      if (def) {
+        const qtyStr = data.quantity > 1 ? ` x${data.quantity}` : '';
+        this.showNotification(`Acquired: ${def.name}${qtyStr}`);
+      }
     });
   }
 
