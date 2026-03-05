@@ -39,3 +39,31 @@ export interface MemoryContext {
   relevantBeliefs: SemanticBelief[];
   relationship: SocialRelationship | null;
 }
+
+export interface LLMResponse {
+  dialogue: string;
+  internal_thought: string;
+  mood_change: number;       // -1 to 1
+  action: string | null;
+  memory_to_store: string;
+}
+
+export interface NPCGoal {
+  id: string;
+  description: string;
+  priority: number; // 1-5
+  status: 'active' | 'completed' | 'failed' | 'blocked';
+  progress: number; // 0 to 1
+  blockedReason?: string;
+}
+
+export interface GossipPacket {
+  from: string;
+  to: string;
+  subject: string;
+  content: string;
+  reliability: number; // 0 to 1, degrades with each hop
+  originalSource: string;
+  hops: number;
+  timestamp: number; // game day
+}

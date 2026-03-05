@@ -28,7 +28,7 @@ export const NPC_PERSONAS: NPCPersona[] = [
     backstory: 'Third-generation blacksmith. Lost his wife to illness five years ago. Pours himself into his work as a way to cope.',
     values: ['craftsmanship', 'honesty', 'tradition'],
     fears: ['losing his forge', 'being unable to provide'],
-    startingGoals: ['master advanced smithing', 'find rare materials', 'train an apprentice'],
+    startingGoals: ['Master the art of weapon forging', 'Find rare materials for a masterwork blade'],
     homePosition: { x: 200, y: 150 },
     workPosition: { x: 250, y: 200 },
     schedule: {
@@ -51,7 +51,7 @@ export const NPC_PERSONAS: NPCPersona[] = [
     backstory: 'Inherited the Thornwick Inn from her parents. Knows everyone and everything happening in the village. Unofficial counselor.',
     values: ['community', 'kindness', 'stories'],
     fears: ['loneliness', 'the village declining'],
-    startingGoals: ['keep the inn thriving', 'help villagers', 'hear a good story'],
+    startingGoals: ['Keep the inn welcoming and profitable', 'Learn about the old legends from books'],
     homePosition: { x: 450, y: 200 },
     workPosition: { x: 450, y: 200 },
     schedule: {
@@ -74,7 +74,7 @@ export const NPC_PERSONAS: NPCPersona[] = [
     backstory: 'Came from the city three years ago. Runs the general store and manages trade caravans. Shrewd but fair.',
     values: ['profit', 'efficiency', 'independence'],
     fears: ['poverty', 'being trapped in a small village forever'],
-    startingGoals: ['expand trade routes', 'save enough to open a city shop', 'find rare goods'],
+    startingGoals: ['Establish trade routes to distant towns', 'Accumulate enough gold to expand the shop'],
     homePosition: { x: 350, y: 350 },
     workPosition: { x: 380, y: 300 },
     schedule: {
@@ -97,7 +97,7 @@ export const NPC_PERSONAS: NPCPersona[] = [
     backstory: 'Worked the same fields his whole life. Wife and two grown children who moved to the city. Content but lonely.',
     values: ['hard work', 'nature', 'family'],
     fears: ['bad harvest', 'dying alone'],
-    startingGoals: ['have a good harvest', 'fix the eastern fence', 'visit his children someday'],
+    startingGoals: ['Produce enough food for the village', 'Protect crops from the spreading darkness'],
     homePosition: { x: 600, y: 400 },
     workPosition: { x: 650, y: 450 },
     schedule: {
@@ -120,7 +120,7 @@ export const NPC_PERSONAS: NPCPersona[] = [
     backstory: 'Former soldier who settled in Thornwick after being wounded. Takes village security very seriously. Haunted by things he saw in the war.',
     values: ['duty', 'order', 'protection'],
     fears: ['failing to protect the village', 'his past catching up'],
-    startingGoals: ['strengthen village defenses', 'train militia', 'investigate wolf sightings'],
+    startingGoals: ['Keep Thornwick safe from all threats', 'Investigate the darkness in the forest'],
     homePosition: { x: 150, y: 400 },
     workPosition: { x: 100, y: 350 },
     schedule: {
@@ -143,7 +143,7 @@ export const NPC_PERSONAS: NPCPersona[] = [
     backstory: 'Orphan raised by the village. Self-taught herbalist who forages in the forest. Knows more about the woods than anyone.',
     values: ['nature', 'healing', 'freedom'],
     fears: ['the forest being cut down', 'being forced to leave'],
-    startingGoals: ['discover a new medicinal plant', 'create a healing garden', 'understand the forest better'],
+    startingGoals: ['Discover new herbal remedies', 'Protect the forest from the Blight'],
     homePosition: { x: 550, y: 150 },
     workPosition: { x: 500, y: 100 },
     schedule: {

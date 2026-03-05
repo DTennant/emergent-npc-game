@@ -28,7 +28,31 @@ export const Events = {
   MEMORY_FORMED: 'memory:formed',
   MEMORY_RECALLED: 'memory:recalled',
 
+  // Inventory events
+  INVENTORY_CHANGE: 'inventory:change',
+  ITEM_ACQUIRED: 'inventory:item_acquired',
+  ITEM_USED: 'inventory:item_used',
+
+  // Village events
+  VILLAGE_EVENT: 'village:event',
+
+  // Combat events
+  PLAYER_ATTACK: 'combat:player_attack',
+  ENTITY_DAMAGED: 'combat:entity_damaged',
+  ENTITY_DIED: 'combat:entity_died',
+  PLAYER_DIED: 'combat:player_died',
+
+  // Quest events
+  QUEST_PROGRESS: 'quest:progress',
+  RUNESTONE_OBTAINED: 'quest:runestone_obtained',
+  SHRINE_ACTIVATED: 'quest:shrine_activated',
+
   // UI events
   SHOW_NOTIFICATION: 'ui:notification',
   UPDATE_HUD: 'ui:update_hud',
+  SETTINGS_OPEN: 'ui:settings_open',
+  SETTINGS_CLOSE: 'ui:settings_close',
+
+  // LLM events
+  LLM_CONFIG_CHANGED: 'llm:config_changed',
 } as const;

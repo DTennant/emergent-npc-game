@@ -3,6 +3,7 @@ import {
   SemanticMemory,
   SocialRelationship,
   MemoryContext,
+  GossipPacket,
 } from './types';
 import { EventBus, Events } from '../world/EventBus';
 
@@ -90,6 +91,36 @@ export class MemoryManager {
     });
 
     return recalled;
+  }
+
+  // --- Gossip Memory ---
+
+  addGossipMemory(packet: GossipPacket): EpisodicMemory {
+    return this.addEpisode({
+      day: packet.timestamp,
+      gameTime: '00:00',
+      type: 'gossip',
+      participants: [packet.from, packet.subject],
+      location: 'village',
+      summary: `${packet.from} said about ${packet.subject}: ${packet.content}`,
+      emotionalValence: 0,
+      importance: Math.max(0.1, 0.5 * packet.reliability),
+      tags: ['gossip', packet.subject],
+    });
+  }
+
+  getShareableMemories(currentDay: number, limit = 3): EpisodicMemory[] {
+    const candidates = this.episodicMemories.filter(
+      (m) => m.type !== 'gossip' && m.importance > 0.4
+    );
+
+    candidates.sort((a, b) => {
+      const recencyA = Math.exp(-0.1 * (currentDay - a.timestamp));
+      const recencyB = Math.exp(-0.1 * (currentDay - b.timestamp));
+      return (recencyB * b.importance) - (recencyA * a.importance);
+    });
+
+    return candidates.slice(0, limit);
   }
 
   // --- Semantic Memory ---
@@ -198,5 +229,27 @@ export class MemoryManager {
       semantic: Object.fromEntries(this.semanticMemories),
       social: Object.fromEntries(this.socialRelationships),
     };
+  }
+
+  fromJSON(data: {
+    ownerId: string;
+    episodic: EpisodicMemory[];
+    semantic: Record<string, SemanticMemory>;
+    social: Record<string, SocialRelationship>;
+  }): void {
+    this.episodicMemories = data.episodic.map((e) => ({ ...e }));
+    this.semanticMemories = new Map(Object.entries(data.semantic));
+    this.socialRelationships = new Map(Object.entries(data.social));
+
+    // Restore memoryIdCounter to avoid ID collisions
+    let maxId = 0;
+    for (const ep of this.episodicMemories) {
+      const match = ep.id.match(/_(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxId) maxId = num;
+      }
+    }
+    memoryIdCounter = Math.max(memoryIdCounter, maxId);
   }
 }

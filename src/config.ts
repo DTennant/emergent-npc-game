@@ -20,6 +20,22 @@ export const COLORS = {
   herbShop: 0x339966,
 };
 
+export const BUILDING_COLLISION_PADDING = 0.85;
+
+// Combat constants
+export const ATTACK_COOLDOWN_MS = 500;
+export const ATTACK_RANGE = TILE_SIZE;
+export const PLAYER_MAX_HEALTH = 100;
+export const INVINCIBILITY_MS = 250;
+
+export const GOSSIP_RANGE = TILE_SIZE * 4;
+export const GOSSIP_INTERVAL_MS = 10000;
+
+// Blight constants
+export const BLIGHT_BASE_INTENSITY = 0.1;
+export const BLIGHT_DAILY_INCREASE = 0.02;
+export const BLIGHT_OVERLAY_DEPTH = 30;
+
 export const NPC_COLORS: Record<string, number> = {
   blacksmith_erik: 0xcc4400,
   innkeeper_rose: 0xdd6699,

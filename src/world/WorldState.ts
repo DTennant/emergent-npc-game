@@ -1,4 +1,7 @@
+import { BlightSystemJSON } from './BlightSystem';
 import { EventBus, Events } from './EventBus';
+import { VillageMemory, VillageMemoryJSON } from './VillageMemory';
+import { StorylineManagerJSON } from '../story/StorylineManager';
 import { DAY_LENGTH_MS } from '../config';
 
 export interface VillageState {
@@ -6,7 +9,20 @@ export interface VillageState {
   population: number;
   prosperity: number; // 0-1
   safety: number; // 0-1
+  blightIntensity: number; // 0-1
   resources: Record<string, number>;
+}
+
+export interface WorldStateJSON {
+  day: number;
+  gameTime: number;
+  elapsedMs: number;
+  paused: boolean;
+  village: VillageState;
+  worldFacts: string[];
+  villageMemory?: VillageMemoryJSON;
+  blightSystem?: BlightSystemJSON;
+  storyline?: StorylineManagerJSON;
 }
 
 export class WorldState {
@@ -20,6 +36,7 @@ export class WorldState {
     population: 6,
     prosperity: 0.6,
     safety: 0.8,
+    blightIntensity: 0,
     resources: {
       food: 100,
       iron: 50,
@@ -29,7 +46,11 @@ export class WorldState {
     },
   };
 
-  // Track known facts about the world
+  public blightSystemData: BlightSystemJSON | undefined;
+  public storylineData: StorylineManagerJSON | undefined;
+
+  public villageMemory = new VillageMemory();
+
   public worldFacts: string[] = [
     'Thornwick is a small village surrounded by forest',
     'The northern mines have been producing less iron lately',
@@ -94,5 +115,37 @@ export class WorldState {
 
   resume(): void {
     this.paused = false;
+  }
+
+  toJSON(): WorldStateJSON {
+    return {
+      day: this.day,
+      gameTime: this.gameTime,
+      elapsedMs: this.elapsedMs,
+      paused: this.paused,
+      village: {
+        ...this.village,
+        resources: { ...this.village.resources },
+      },
+      worldFacts: [...this.worldFacts],
+      villageMemory: this.villageMemory.toJSON(),
+      blightSystem: this.blightSystemData,
+      storyline: this.storylineData,
+    };
+  }
+
+  fromJSON(data: WorldStateJSON): void {
+    this.day = data.day;
+    this.gameTime = data.gameTime;
+    this.elapsedMs = data.elapsedMs;
+    this.paused = data.paused;
+    this.village = {
+      ...data.village,
+      resources: { ...data.village.resources },
+    };
+    this.worldFacts = [...data.worldFacts];
+    if (data.villageMemory) {
+      this.villageMemory.fromJSON(data.villageMemory);
+    }
   }
 }
