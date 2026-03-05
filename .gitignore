@@ -1,0 +1,50 @@
+# Godot-specific ignores
+.import/
+export.cfg
+export_presets.cfg
+
+# Godot auto-generated files
+*.translation
+.mono/
+data_*/
+
+# Godot 4.x specific
+.godot/
+*.import
+
+# Save data (player progress and NPC memories)
+godot/save/
+save/
+
+# API keys and secrets
+*.key
+*.secret
+api_key.txt
+config.json
+.env
+
+# OS-specific
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Python (if using Python backend)
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.pytest_cache/
+
+# Build artifacts
+*.o
+*.so
+*.dll
+*.exe
+*.out
