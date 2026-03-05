@@ -1,6 +1,6 @@
 # 🌍 Emergent NPC World
 
-**AI-driven NPCs with memory, personality, and emergent social dynamics — built with Godot 4**
+**AI-driven NPCs with memory, personality, and emergent social dynamics**
 
 > What if game NPCs weren't scripted actors, but living beings that remember you, form opinions, and create stories no designer ever wrote?
 
@@ -20,8 +20,8 @@ The result: a game world where your reputation is *earned*, not assigned; where 
 
 ```
 ┌─────────────────────────────────────────┐
-│              Godot 4 Engine             │
-│         (Rendering, Physics, UI)        │
+│           Phaser 3 Engine               │
+│     (Rendering, Physics, UI, Web)       │
 ├─────────────────────────────────────────┤
 │           Behavior Layer                │
 │    (Movement, Animation, Interaction)   │
@@ -33,7 +33,7 @@ The result: a game world where your reputation is *earned*, not assigned; where 
 │  └────┬────┘ └────┬────┘ └────┬────┘   │
 │       └───────────┼───────────┘        │
 │                   ▼                     │
-│            LLM API Bridge               │
+│            LLM API Client               │
 ├─────────────────────────────────────────┤
 │           World State Layer             │
 │  ┌──────────┐ ┌──────────┐ ┌────────┐  │
@@ -53,16 +53,13 @@ emergent-npc-game/
 │   ├── emergent-systems.md  # Emergent gameplay mechanics
 │   ├── memory-system.md     # Memory & knowledge architecture
 │   └── technical-spec.md    # Technical implementation details
-├── godot/                   # Godot 4 project
-│   ├── project.godot        # Project configuration
-│   ├── scenes/              # Game scenes
-│   ├── scripts/             # GDScript files
-│   │   ├── npc/             # NPC agent system
-│   │   ├── world/           # World state management
-│   │   ├── ai/              # LLM integration
-│   │   └── ui/              # UI components
-│   ├── resources/           # Game resources
-│   └── assets/              # Art, audio, etc.
+├── src/                     # TypeScript source (WIP)
+│   ├── scenes/              # Phaser scenes
+│   ├── npc/                 # NPC agent system
+│   ├── world/               # World state management
+│   ├── ai/                  # LLM integration
+│   └── ui/                  # UI components
+├── godot/                   # Legacy Godot 4 prototype
 └── README.md
 ```
 
@@ -82,14 +79,25 @@ No two playthroughs are the same. The story of your game is the sum of thousands
 
 ## Tech Stack
 
-- **Engine:** Godot 4.x (GDScript)
+- **Engine:** Phaser 3 (migrated from Godot 4 prototype)
+- **Language:** TypeScript
+- **Build:** Vite
 - **AI Backend:** LLM API (OpenAI / local models via LiteLLM)
 - **Data:** JSON-based world state & memory persistence
-- **Target:** Desktop (Windows/Mac/Linux), potentially Web export
+- **Target:** Web (browser-native)
+
+## Getting Started
+
+```bash
+npm install
+npm run dev
+```
+
+Open `localhost:8080` — WASD to move, E to interact with NPCs.
 
 ## Status
 
-🚧 **Early Development** — Architecture design & prototype phase
+🚧 **Early Development** — Architecture design & engine migration (Godot → Phaser 3)
 
 ## Inspirations
 
