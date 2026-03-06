@@ -14,6 +14,7 @@ import {
   PLAYER_SPEED,
   PLAYER_MAX_HEALTH,
   INVINCIBILITY_MS,
+  fs,
 } from '../config';
 
 interface DungeonInitData {
@@ -71,6 +72,7 @@ export class DungeonScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(this.dungeonDef.bgColor);
+    this.cameras.main.resetFX();
     this.cameras.main.fadeIn(500);
 
     this.player = this.physics.add.sprite(
@@ -106,7 +108,7 @@ export class DungeonScene extends Phaser.Scene {
     this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
     this.roomLabel = this.add.text(10, 10, '', {
-      fontSize: '30px',
+      fontSize: fs(30),
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 2,
@@ -116,7 +118,7 @@ export class DungeonScene extends Phaser.Scene {
     this.roomLabel.setScrollFactor(0);
 
     this.escLabel = this.add.text(GAME_WIDTH - 10, 10, '[ESC] Exit Dungeon', {
-      fontSize: '26px',
+      fontSize: fs(26),
       color: '#aaaaaa',
       stroke: '#000000',
       strokeThickness: 2,
@@ -282,7 +284,7 @@ export class DungeonScene extends Phaser.Scene {
       );
 
       const doorLabel = this.add.text(doorPos.x, doorPos.y - TILE_SIZE * 2.5, 'Next Room →', {
-        fontSize: '24px',
+        fontSize: fs(24),
         color: '#00ff00',
         stroke: '#000000',
         strokeThickness: 2,

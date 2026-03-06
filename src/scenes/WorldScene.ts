@@ -22,6 +22,7 @@ import {
   BUILDING_COLLISION_PADDING,
   PLAYER_MAX_HEALTH,
   INVINCIBILITY_MS,
+  fs,
 } from '../config';
 
 interface ItemPickupDef {
@@ -79,6 +80,7 @@ export class WorldScene extends Phaser.Scene {
   private spawnX = GAME_WIDTH / 2;
   private spawnY = GAME_HEIGHT / 2;
   private innMarker: Phaser.GameObjects.Text | null = null;
+  private innMarkerListener: ((data: { npc: { persona: { id: string; name: string } } }) => void) | null = null;
 
   constructor() {
     super({ key: 'WorldScene' });
@@ -109,7 +111,7 @@ export class WorldScene extends Phaser.Scene {
       this.player.y - TILE_SIZE * 0.7,
       'You',
       {
-        fontSize: '24px',
+        fontSize: fs(24),
         color: '#88bbff',
         stroke: '#000000',
         strokeThickness: 2,
@@ -167,7 +169,7 @@ export class WorldScene extends Phaser.Scene {
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     this.interactionPrompt = this.add.text(0, 0, '[E] Talk', {
-      fontSize: '26px',
+      fontSize: fs(26),
       color: '#ffff00',
       stroke: '#000000',
       strokeThickness: 3,
@@ -237,6 +239,7 @@ export class WorldScene extends Phaser.Scene {
       this.handlePlayerAttack();
     });
 
+    this.cameras.main.resetFX();
     this.cameras.main.fadeIn(400);
 
     this.createInnMarker();
@@ -276,6 +279,7 @@ export class WorldScene extends Phaser.Scene {
     EventBus.off(Events.LLM_CONFIG_CHANGED, this.onLLMConfigChanged, this);
     EventBus.off(Events.ITEM_ACQUIRED, this.onItemAcquired, this);
     EventBus.off(Events.PLAYER_DIED, this.onPlayerDied, this);
+    this.destroyInnMarker();
   }
 
   private onDayChange(data: { day: number }): void {
@@ -378,7 +382,7 @@ export class WorldScene extends Phaser.Scene {
 
       this.add
         .text(b.x, b.y - b.h / 2 - 8, b.label, {
-          fontSize: '22px',
+          fontSize: fs(22),
           color: '#ffffff',
           stroke: '#000000',
           strokeThickness: 2,
@@ -423,7 +427,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.add
       .text(GAME_WIDTH / 2, 20, '\uD83C\uDFD8\uFE0F Thornwick Village', {
-        fontSize: '34px',
+        fontSize: fs(34),
         color: '#ffffff',
         stroke: '#000000',
         strokeThickness: 3,
@@ -433,7 +437,7 @@ export class WorldScene extends Phaser.Scene {
       .setDepth(15);
 
     const exitHint = this.add.text(GAME_WIDTH - 10, GAME_HEIGHT / 2, '\u2192 Dark Woods', {
-      fontSize: '24px',
+      fontSize: fs(24),
       color: '#aaffaa',
       stroke: '#000000',
       strokeThickness: 2,
@@ -610,13 +614,13 @@ export class WorldScene extends Phaser.Scene {
     const bg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 400, 150, 0x000000, 0.85);
     bg.setDepth(200);
     const text = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 25, message, {
-      fontSize: '38px',
+      fontSize: fs(38),
       color: '#ffffff',
       align: 'center',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(201);
     const hint = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 20, '[Y] Yes    [N] No', {
-      fontSize: '30px',
+      fontSize: fs(30),
       color: '#aaaaaa',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(201);
@@ -696,7 +700,7 @@ export class WorldScene extends Phaser.Scene {
       });
 
       const label = this.add.text(def.x, def.y - 16, def.label, {
-        fontSize: '20px',
+        fontSize: fs(20),
         color: '#ffdd44',
         stroke: '#000000',
         strokeThickness: 2,
@@ -838,7 +842,7 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.shrineLabel = this.add.text(640, 61, 'Shrine of Dawn', {
-      fontSize: '22px',
+      fontSize: fs(22),
       color: '#ffd700',
       stroke: '#000000',
       strokeThickness: 2,
@@ -1086,7 +1090,7 @@ export class WorldScene extends Phaser.Scene {
     overlay.setDepth(300);
 
     const titleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.3, 'Emergent NPC World', {
-      fontSize: '42px',
+      fontSize: fs(42),
       color: '#ffd700',
       fontStyle: 'bold',
       stroke: '#000000',
@@ -1097,7 +1101,7 @@ export class WorldScene extends Phaser.Scene {
     titleText.setDepth(301);
 
     const bodyText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.5, storyBeats[0], {
-      fontSize: '56px',
+      fontSize: fs(56),
       color: '#ffffff',
       align: 'center',
       wordWrap: { width: GAME_WIDTH * 0.7 },
@@ -1110,7 +1114,7 @@ export class WorldScene extends Phaser.Scene {
     bodyText.setDepth(301);
 
     const instructionText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.8, '[Press any key to continue]', {
-      fontSize: '22px',
+      fontSize: fs(22),
       color: '#888888',
       align: 'center',
       resolution: window.devicePixelRatio,
@@ -1181,7 +1185,7 @@ export class WorldScene extends Phaser.Scene {
     const innY = 248;
 
     this.innMarker = this.add.text(innX, innY, '!', {
-      fontSize: '56px',
+      fontSize: fs(56),
       color: '#ffd700',
       fontStyle: 'bold',
       stroke: '#000000',
@@ -1200,16 +1204,19 @@ export class WorldScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
-    const onDialogueStart = (data: { npc: { persona: { id: string; name: string } } }) => {
+    this.innMarkerListener = (data: { npc: { persona: { id: string; name: string } } }) => {
       if (data.npc.persona.id === 'innkeeper_rose' || data.npc.persona.name === 'Rose') {
         this.destroyInnMarker();
-        EventBus.off(Events.DIALOGUE_START, onDialogueStart);
       }
     };
-    EventBus.on(Events.DIALOGUE_START, onDialogueStart);
+    EventBus.on(Events.DIALOGUE_START, this.innMarkerListener);
   }
 
   private destroyInnMarker(): void {
+    if (this.innMarkerListener) {
+      EventBus.off(Events.DIALOGUE_START, this.innMarkerListener);
+      this.innMarkerListener = null;
+    }
     if (this.innMarker) {
       this.tweens.killTweensOf(this.innMarker);
       this.innMarker.destroy();

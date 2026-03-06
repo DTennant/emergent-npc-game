@@ -16,6 +16,7 @@ import {
   COLORS,
   PLAYER_MAX_HEALTH,
   INVINCIBILITY_MS,
+  fs,
 } from '../config';
 
 interface ItemPickupDef {
@@ -89,7 +90,7 @@ export class WoodsScene extends Phaser.Scene {
       this.player.y - TILE_SIZE * 0.7,
       'You',
       {
-        fontSize: '24px',
+        fontSize: fs(24),
         color: '#88bbff',
         stroke: '#000000',
         strokeThickness: 2,
@@ -129,7 +130,7 @@ export class WoodsScene extends Phaser.Scene {
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     this.interactionPrompt = this.add.text(0, 0, '', {
-      fontSize: '26px',
+      fontSize: fs(26),
       color: '#ffff00',
       stroke: '#000000',
       strokeThickness: 3,
@@ -167,6 +168,7 @@ export class WoodsScene extends Phaser.Scene {
       this.handlePlayerAttack();
     });
 
+    this.cameras.main.resetFX();
     this.cameras.main.fadeIn(400);
   }
 
@@ -265,7 +267,7 @@ export class WoodsScene extends Phaser.Scene {
 
     this.add
       .text(GAME_WIDTH / 2, 20, '\uD83C\uDF32 Dark Woods', {
-        fontSize: '34px',
+        fontSize: fs(34),
         color: '#88ff88',
         stroke: '#000000',
         strokeThickness: 3,
@@ -275,7 +277,7 @@ export class WoodsScene extends Phaser.Scene {
       .setDepth(15);
 
     const exitHint = this.add.text(10, GAME_HEIGHT / 2, '\u2190 Village', {
-      fontSize: '24px',
+      fontSize: fs(24),
       color: '#aaffaa',
       stroke: '#000000',
       strokeThickness: 2,
@@ -387,7 +389,7 @@ export class WoodsScene extends Phaser.Scene {
       rect.setStrokeStyle(2, 0xffffff, 0.3);
 
       const label = this.add.text(ent.x, ent.y - ent.h / 2 - 10, ent.label, {
-        fontSize: '22px',
+        fontSize: fs(22),
         color: '#ffffff',
         stroke: '#000000',
         strokeThickness: 2,
@@ -468,7 +470,7 @@ export class WoodsScene extends Phaser.Scene {
       });
 
       const label = this.add.text(def.x, def.y - 16, def.label, {
-        fontSize: '20px',
+        fontSize: fs(20),
         color: '#ffdd44',
         stroke: '#000000',
         strokeThickness: 2,
@@ -545,13 +547,13 @@ export class WoodsScene extends Phaser.Scene {
     const bg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 400, 150, 0x000000, 0.85);
     bg.setDepth(200);
     const text = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 25, message, {
-      fontSize: '38px',
+      fontSize: fs(38),
       color: '#ffffff',
       align: 'center',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(201);
     const hint = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 20, '[Y] Yes    [N] No', {
-      fontSize: '30px',
+      fontSize: fs(30),
       color: '#aaaaaa',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(201);
@@ -639,7 +641,7 @@ export class WoodsScene extends Phaser.Scene {
 
   private showDamageNumber(x: number, y: number, damage: number): void {
     const dmgText = this.add.text(x, y, `-${damage}`, {
-      fontSize: '34px',
+      fontSize: fs(34),
       color: '#ff4444',
       fontStyle: 'bold',
       stroke: '#000000',
