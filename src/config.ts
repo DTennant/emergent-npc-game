@@ -1,5 +1,5 @@
-export const GAME_WIDTH = 800;
-export const GAME_HEIGHT = 600;
+export const GAME_WIDTH = 1280;
+export const GAME_HEIGHT = 960;
 export const TILE_SIZE = 32;
 export const PLAYER_SPEED = 150;
 export const NPC_SPEED = 60;

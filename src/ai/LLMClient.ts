@@ -43,6 +43,7 @@ function makeFallbackResponse(dialogue: string): LLMResponse {
     mood_change: 0,
     action: null,
     memory_to_store: dialogue,
+    belief_update: null,
   };
 }
 
@@ -130,7 +131,8 @@ export class LLMClient {
     },
     memoryContext: MemoryContext,
     playerMessage: string,
-    worldContext: string
+    worldContext: string,
+    fullMemoryNarrative?: string
   ): Promise<LLMResponse> {
     if (!this.hasApiKey()) {
       return this.getFallbackResponse(memoryContext);
@@ -139,7 +141,8 @@ export class LLMClient {
     const systemPrompt = this.buildSystemPrompt(
       npcPersona,
       memoryContext,
-      worldContext
+      worldContext,
+      fullMemoryNarrative
     );
 
     return this.enqueueRequest([
@@ -157,9 +160,19 @@ export class LLMClient {
       backstory: string;
     },
     memory: MemoryContext,
-    worldContext: string
+    worldContext: string,
+    fullMemoryNarrative?: string
   ): string {
-    let prompt = `You are ${persona.name}, the ${persona.role} of Thornwick village.
+    let prompt: string;
+
+    if (fullMemoryNarrative) {
+      prompt = `You are ${persona.name}, the ${persona.role} of Thornwick village.
+
+${fullMemoryNarrative}
+
+WORLD CONTEXT: ${worldContext}`;
+    } else {
+      prompt = `You are ${persona.name}, the ${persona.role} of Thornwick village.
 
 PERSONALITY: ${persona.personality}
 SPEECH STYLE: ${persona.speechStyle}
@@ -167,28 +180,29 @@ BACKSTORY: ${persona.backstory}
 
 WORLD CONTEXT: ${worldContext}`;
 
-    if (memory.relationship) {
-      const rel = memory.relationship;
-      prompt += `\n\nRELATIONSHIP WITH PLAYER:
+      if (memory.relationship) {
+        const rel = memory.relationship;
+        prompt += `\n\nRELATIONSHIP WITH PLAYER:
 - Trust: ${(rel.trust * 100).toFixed(0)}%
 - Affection: ${(rel.affection * 100).toFixed(0)}%
 - Familiarity: ${(rel.familiarity * 100).toFixed(0)}%`;
-      if (rel.notes.length > 0) {
-        prompt += `\n- Notes: ${rel.notes.slice(-3).join('; ')}`;
+        if (rel.notes.length > 0) {
+          prompt += `\n- Notes: ${rel.notes.slice(-3).join('; ')}`;
+        }
       }
-    }
 
-    if (memory.recentEpisodes.length > 0) {
-      prompt += '\n\nRECENT MEMORIES OF THIS PERSON:';
-      for (const ep of memory.recentEpisodes) {
-        prompt += `\n- Day ${ep.timestamp}: ${ep.summary}`;
+      if (memory.recentEpisodes.length > 0) {
+        prompt += '\n\nRECENT MEMORIES OF THIS PERSON:';
+        for (const ep of memory.recentEpisodes) {
+          prompt += `\n- Day ${ep.timestamp}: ${ep.summary}`;
+        }
       }
-    }
 
-    if (memory.relevantBeliefs.length > 0) {
-      prompt += '\n\nBELIEFS ABOUT THIS PERSON:';
-      for (const b of memory.relevantBeliefs) {
-        prompt += `\n- ${b.fact} (confidence: ${(b.confidence * 100).toFixed(0)}%)`;
+      if (memory.relevantBeliefs.length > 0) {
+        prompt += '\n\nBELIEFS ABOUT THIS PERSON:';
+        for (const b of memory.relevantBeliefs) {
+          prompt += `\n- ${b.fact} (confidence: ${(b.confidence * 100).toFixed(0)}%)`;
+        }
       }
     }
 
@@ -199,7 +213,8 @@ Respond with a JSON object containing:
 - "internal_thought": What you're privately thinking
 - "mood_change": How this affects your mood (-1.0 to 1.0, 0 = neutral)
 - "action": A physical action you take (or null)
-- "memory_to_store": What you'll remember about this interaction`;
+- "memory_to_store": What you'll remember about this interaction
+- "belief_update": A belief you now hold differently after this interaction (or null if unchanged)`;
     return prompt;
   }
 
@@ -301,6 +316,7 @@ Respond with a JSON object containing:
         mood_change: Math.max(-1, Math.min(1, parsed.mood_change ?? 0)),
         action: parsed.action ?? null,
         memory_to_store: parsed.memory_to_store ?? parsed.dialogue ?? content,
+        belief_update: parsed.belief_update ?? null,
       };
     } catch {
       return makeFallbackResponse(content || 'I have nothing to say.');

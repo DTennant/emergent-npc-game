@@ -5,7 +5,7 @@ import { MemoryManager } from '../memory/MemoryManager';
 import { LLMClient } from '../ai/LLMClient';
 import { WorldState } from '../world/WorldState';
 import { LLMResponse } from '../memory/types';
-import { NPC_SPEED, TILE_SIZE } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT, NPC_SPEED, TILE_SIZE } from '../config';
 import { EventBus, Events } from '../world/EventBus';
 import { QuestGateChecker } from '../quest/QuestGates';
 import { StorylineManager } from '../story/StorylineManager';
@@ -40,6 +40,11 @@ export class NPC {
         note: rel.notes[0],
         day: 0,
       });
+    }
+
+    this.memory.loadPersistentMemory(persona.id);
+    if (!this.memory.getSoulDocument()) {
+      this.memory.generateSoulDocument(persona);
     }
 
     const textureKey = NPC_TEXTURE_MAP[persona.id] ?? 'npc_blacksmith';
@@ -101,6 +106,8 @@ export class NPC {
       this.moveToward(this.wanderTarget);
     } else {
       this.sprite.setVelocity(0, 0);
+      this.sprite.anims?.stop();
+      this.sprite.setFrame(0);
     }
 
     this.mood += (0.5 - this.mood) * 0.0001 * delta;
@@ -118,7 +125,7 @@ export class NPC {
     if (activity === 'sleep' || activity.includes('home')) {
       this.wanderTarget = { ...this.persona.homePosition };
     } else if (activity.includes('inn') || activity === 'dinner') {
-      this.wanderTarget = { x: 450, y: 200 };
+      this.wanderTarget = { x: 720, y: 320 };
     } else {
       this.wanderTarget = { ...this.persona.workPosition };
     }
@@ -134,8 +141,8 @@ export class NPC {
       y: baseY + (Math.random() - 0.5) * range,
     };
 
-    this.wanderTarget.x = Math.max(40, Math.min(760, this.wanderTarget.x));
-    this.wanderTarget.y = Math.max(40, Math.min(560, this.wanderTarget.y));
+    this.wanderTarget.x = Math.max(40, Math.min(GAME_WIDTH - 40, this.wanderTarget.x));
+    this.wanderTarget.y = Math.max(40, Math.min(GAME_HEIGHT - 40, this.wanderTarget.y));
   }
 
   private moveToward(target: { x: number; y: number }): void {
@@ -145,6 +152,8 @@ export class NPC {
 
     if (dist < 5) {
       this.sprite.setVelocity(0, 0);
+      this.sprite.anims?.stop();
+      this.sprite.setFrame(0);
       this.wanderTarget = null;
       return;
     }
@@ -152,6 +161,16 @@ export class NPC {
     const vx = (dx / dist) * NPC_SPEED;
     const vy = (dy / dist) * NPC_SPEED;
     this.sprite.setVelocity(vx, vy);
+
+    const facing = Math.abs(dx) >= Math.abs(dy) 
+      ? (dx > 0 ? 'right' : 'left') 
+      : (dy > 0 ? 'down' : 'up');
+    
+    const textureKey = this.sprite.texture.key;
+    const animKey = `${textureKey}_walk_${facing}`;
+    if (this.sprite.anims && this.sprite.anims.currentAnim?.key !== animKey) {
+      this.sprite.anims.play(animKey, true);
+    }
   }
 
   async generateResponse(
@@ -199,11 +218,6 @@ export class NPC {
       }
     }
 
-    const goalSummary = this.goals.getGoalSummary();
-    if (goalSummary) {
-      worldContext += `\n${goalSummary}`;
-    }
-
     this.memory.addEpisode({
       day,
       gameTime: worldState.getTimeString(),
@@ -221,6 +235,9 @@ export class NPC {
       day,
     });
 
+    this.memory.trackPlayerTrust();
+    const fullMemoryNarrative = this.memory.getFullMemoryNarrative(day, this.goals);
+
     const response = await llmClient.generateDialogue(
       {
         name: this.persona.name,
@@ -231,7 +248,8 @@ export class NPC {
       },
       memoryContext,
       playerMessage,
-      worldContext
+      worldContext,
+      fullMemoryNarrative
     );
 
     this.mood = Math.max(0, Math.min(1, this.mood + response.mood_change * 0.1));
@@ -253,6 +271,18 @@ export class NPC {
       importance: 0.3,
       tags: ['player', 'dialogue', 'self'],
     });
+
+    if (response.belief_update) {
+      this.memory.updateBelief(
+        'player',
+        response.belief_update,
+        0.7,
+        'interaction',
+        day
+      );
+    }
+
+    this.memory.savePersistentMemory(this.persona.id);
 
     return response;
   }

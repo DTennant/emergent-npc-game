@@ -20,10 +20,20 @@ export class BootScene extends Phaser.Scene {
 
     // Load Kenney UI atlas (Starling XML format)
     this.load.atlasXML('kenney_ui', 'assets/kenney/uipack_rpg_sheet.png', 'assets/kenney/uipack_rpg_sheet.xml');
+
+    // Load AI-Town folk spritesheet source (we'll slice it up in create)
+    this.load.image('folk_sheet', 'assets/32x32folk.png');
+
+    // Load campfire spritesheet
+    this.load.spritesheet('campfire', 'assets/spritesheets/campfire.png', {
+      frameWidth: 32,
+      frameHeight: 32,
+    });
   }
 
   create(): void {
     this.generateTextures();
+    this.upgradeToSpritesheetCharacters();
 
     // Disabled: Kenney spritesheet frame indices need remapping
     // this.upgradeTextures();
@@ -97,6 +107,98 @@ export class BootScene extends Phaser.Scene {
       if (tex && tex.key !== '__MISSING') {
         tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
       }
+    }
+  }
+
+  private upgradeToSpritesheetCharacters(): void {
+    if (!this.textures.exists('folk_sheet')) return;
+
+    const source = this.textures.get('folk_sheet').getSourceImage() as HTMLImageElement;
+    
+    // Character definitions: [atlasPrefix, textureKey, startX, startY]
+    // 32x32folk.png mapping based on grid
+    const characters: [string, string, number, number][] = [
+      ['player', TextureKeys.PLAYER, 0, 0],
+      ['anna', TextureKeys.NPC_MERCHANT, 192, 0],
+      ['erik', TextureKeys.NPC_BLACKSMITH, 288, 0],
+      ['willow', TextureKeys.NPC_HERBALIST, 0, 128],
+      ['rose', TextureKeys.NPC_INNKEEPER, 96, 128],
+      ['thomas', TextureKeys.NPC_FARMER, 192, 128],
+      ['marcus', TextureKeys.NPC_GUARD, 288, 128],
+    ];
+    
+    for (const [prefix, textureKey, baseX, baseY] of characters) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 96;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(source, baseX, baseY, 96, 128, 0, 0, 96, 128);
+
+      if (this.textures.exists(textureKey)) {
+        this.textures.remove(this.textures.get(textureKey));
+      }
+
+      const canvasTex = this.textures.createCanvas(textureKey, 96, 128);
+      if (!canvasTex) continue;
+      const destCtx = canvasTex.getContext();
+      destCtx.drawImage(canvas, 0, 0);
+      canvasTex.refresh();
+
+      const texture = this.textures.get(textureKey);
+      let frameIdx = 0;
+      for (let row = 0; row < 4; row++) {
+        for (let col = 0; col < 3; col++) {
+          texture.add(frameIdx, 0, col * 32, row * 32, 32, 32);
+          frameIdx++;
+        }
+      }
+      
+      const tex = this.textures.get(textureKey);
+      if (tex) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+      
+      this.anims.create({
+        key: `${textureKey}_walk_down`,
+        frames: this.anims.generateFrameNumbers(textureKey, { start: 0, end: 2 }),
+        frameRate: 8,
+        repeat: -1,
+        yoyo: true,
+      });
+
+      this.anims.create({
+        key: `${textureKey}_walk_left`,
+        frames: this.anims.generateFrameNumbers(textureKey, { start: 3, end: 5 }),
+        frameRate: 8,
+        repeat: -1,
+        yoyo: true,
+      });
+
+      this.anims.create({
+        key: `${textureKey}_walk_right`,
+        frames: this.anims.generateFrameNumbers(textureKey, { start: 6, end: 8 }),
+        frameRate: 8,
+        repeat: -1,
+        yoyo: true,
+      });
+
+      this.anims.create({
+        key: `${textureKey}_walk_up`,
+        frames: this.anims.generateFrameNumbers(textureKey, { start: 9, end: 11 }),
+        frameRate: 8,
+        repeat: -1,
+        yoyo: true,
+      });
+    }
+    
+    if (this.textures.exists('campfire')) {
+      const campTex = this.textures.get('campfire');
+      campTex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+      
+      this.anims.create({
+        key: 'campfire_burn',
+        frames: this.anims.generateFrameNumbers('campfire', { start: 0, end: 3 }),
+        frameRate: 6,
+        repeat: -1,
+      });
     }
   }
 

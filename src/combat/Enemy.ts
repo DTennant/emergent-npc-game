@@ -149,10 +149,9 @@ export class Enemy {
     this.scene.tweens.add({
       targets: this.sprite,
       alpha: 0,
-      duration: 300,
-      onStart: () => {
-        this.sprite.setTint(0x222222);
-      },
+      scaleX: 0.5,
+      scaleY: 0.5,
+      duration: 500,
       onComplete: () => {
         this.cleanup();
       },
@@ -162,8 +161,12 @@ export class Enemy {
   }
 
   private cleanup(): void {
-    this.sprite.destroy();
-    this.healthBar.destroy();
+    if (this.sprite && this.sprite.active) {
+      this.sprite.destroy();
+    }
+    if (this.healthBar) {
+      this.healthBar.destroy();
+    }
   }
 
   destroy(): void {

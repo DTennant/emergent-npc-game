@@ -46,6 +46,30 @@ export interface LLMResponse {
   mood_change: number;       // -1 to 1
   action: string | null;
   memory_to_store: string;
+  belief_update: string | null;
+}
+
+export type CharacterArcStage = 'opening' | 'developing' | 'turning_point' | 'resolution';
+
+export interface SoulDocument {
+  name: string;
+  role: string;
+  age: number;
+  personality: string;
+  speechStyle: string;
+  backstory: string;
+  values: string[];
+  fears: string[];
+  coreIdentity: string; // A 1-2 sentence distilled identity statement
+}
+
+export interface MemoryDocument {
+  lastUpdated: number; // game day
+  relationshipSummary: string; // Prose summary of key relationships
+  significantEvents: string[]; // Most impactful events (max 10)
+  evolvingBeliefs: string[]; // Beliefs that have changed over time
+  characterArc: CharacterArcStage; // Current arc stage
+  arcNarrative: string; // 1-2 sentences describing NPC's current character journey
 }
 
 export interface NPCGoal {

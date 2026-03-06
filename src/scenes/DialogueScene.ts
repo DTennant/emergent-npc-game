@@ -24,7 +24,7 @@ export class DialogueScene extends Phaser.Scene {
   private inputElement!: HTMLInputElement;
   private inputDom!: Phaser.GameObjects.DOMElement;
   private isWaiting = false;
-  private conversationLog: { speaker: string; text: string }[] = [];
+  private conversationLog: { speaker: string; text: string; isTyping?: boolean }[] = [];
   private styleElement?: HTMLStyleElement;
 
   constructor() {
@@ -120,6 +120,7 @@ export class DialogueScene extends Phaser.Scene {
       .dialogue-log::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
       .dialogue-log::-webkit-scrollbar-thumb { background: #4488ff; border-radius: 4px; }
       .dialogue-log::-webkit-scrollbar-thumb:hover { background: #66aaff; }
+      .typing { color: #888; font-style: italic; }
     `;
     document.head.appendChild(this.styleElement);
 
@@ -163,13 +164,19 @@ export class DialogueScene extends Phaser.Scene {
 
   private async showNPCGreeting(): Promise<void> {
     this.isWaiting = true;
+
+    const typingIdx = this.conversationLog.length;
+    this.conversationLog.push({ speaker: this.npc.persona.name, text: '...', isTyping: true });
+    this.updateDialogueDisplay();
+
     const response = await this.npc.generateResponse(
       this.llmClient,
       '(Player approaches)',
       this.worldState,
       this.storylineManager
     );
-    this.conversationLog.push({ speaker: this.npc.persona.name, text: response.dialogue });
+    
+    this.conversationLog[typingIdx] = { speaker: this.npc.persona.name, text: response.dialogue };
     this.updateDialogueDisplay();
     this.isWaiting = false;
   }
@@ -180,6 +187,10 @@ export class DialogueScene extends Phaser.Scene {
     this.conversationLog.push({ speaker: 'You', text: message });
     this.updateDialogueDisplay();
 
+    const typingIdx = this.conversationLog.length;
+    this.conversationLog.push({ speaker: this.npc.persona.name, text: '...', isTyping: true });
+    this.updateDialogueDisplay();
+
     const response = await this.npc.generateResponse(
       this.llmClient,
       message,
@@ -187,7 +198,7 @@ export class DialogueScene extends Phaser.Scene {
       this.storylineManager
     );
 
-    this.conversationLog.push({ speaker: this.npc.persona.name, text: response.dialogue });
+    this.conversationLog[typingIdx] = { speaker: this.npc.persona.name, text: response.dialogue };
     this.updateDialogueDisplay();
     this.isWaiting = false;
   }
@@ -199,15 +210,19 @@ export class DialogueScene extends Phaser.Scene {
       .map((entry) => {
         const isPlayer = entry.speaker === 'You';
         const color = isPlayer ? '#4488ff' : '#ffcc00';
+        
         // Escape HTML to prevent injection
         const safeText = entry.text
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;');
         
+        const textClass = entry.isTyping ? 'typing' : '';
+        const textStyle = entry.isTyping ? '' : 'color: #eeeeee';
+
         return `<div style="margin-bottom: 8px;">
           <strong style="color: ${color}">${entry.speaker}:</strong> 
-          <span style="color: #eeeeee">${safeText}</span>
+          <span class="${textClass}" style="${textStyle}">${safeText}</span>
         </div>`;
       })
       .join('');

@@ -1,7 +1,7 @@
 import { NPC } from '../npc/NPC';
 import { Inventory } from '../inventory/Inventory';
 import { WorldState, WorldStateJSON } from '../world/WorldState';
-import { EpisodicMemory, SemanticMemory, SocialRelationship } from '../memory/types';
+import { EpisodicMemory, SemanticMemory, SocialRelationship, NPCGoal } from '../memory/types';
 
 interface NPCSaveData {
   memory: {
@@ -10,6 +10,7 @@ interface NPCSaveData {
     semantic: Record<string, SemanticMemory>;
     social: Record<string, SocialRelationship>;
   };
+  goals: NPCGoal[];
   position: { x: number; y: number };
 }
 
@@ -41,6 +42,7 @@ export class SaveManager {
     for (const npc of npcs) {
       npcData[npc.persona.id] = {
         memory: npc.memory.toJSON() as NPCSaveData['memory'],
+        goals: npc.goals.toJSON(),
         position: { x: npc.sprite.x, y: npc.sprite.y },
       };
     }

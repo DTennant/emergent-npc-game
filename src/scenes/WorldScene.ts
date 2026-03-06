@@ -285,12 +285,12 @@ export class WorldScene extends Phaser.Scene {
     this.buildingGroup = this.physics.add.staticGroup();
 
     const buildings = [
-      { x: 230, y: 180, w: 80, h: 60, texture: TextureKeys.BUILDING_FORGE, label: '\u2692\uFE0F Forge' },
-      { x: 440, y: 180, w: 90, h: 70, texture: TextureKeys.BUILDING_INN, label: '\uD83C\uDF7A Inn' },
-      { x: 370, y: 290, w: 70, h: 50, texture: TextureKeys.BUILDING_MARKET, label: '\uD83D\uDED2 Shop' },
-      { x: 640, y: 430, w: 100, h: 60, texture: TextureKeys.BUILDING_FARM, label: '\uD83C\uDF3E Farm' },
-      { x: 100, y: 350, w: 60, h: 50, texture: TextureKeys.BUILDING_GUARD, label: '\uD83D\uDEE1\uFE0F Guard' },
-      { x: 500, y: 100, w: 70, h: 50, texture: TextureKeys.BUILDING_HERBS, label: '\uD83C\uDF3F Herbs' },
+      { x: 368, y: 288, w: 80, h: 60, texture: TextureKeys.BUILDING_FORGE, label: '\u2692\uFE0F Forge' },
+      { x: 704, y: 288, w: 90, h: 70, texture: TextureKeys.BUILDING_INN, label: '\uD83C\uDF7A Inn' },
+      { x: 592, y: 464, w: 70, h: 50, texture: TextureKeys.BUILDING_MARKET, label: '\uD83D\uDED2 Shop' },
+      { x: 1024, y: 688, w: 100, h: 60, texture: TextureKeys.BUILDING_FARM, label: '\uD83C\uDF3E Farm' },
+      { x: 160, y: 560, w: 60, h: 50, texture: TextureKeys.BUILDING_GUARD, label: '\uD83D\uDEE1\uFE0F Guard' },
+      { x: 800, y: 160, w: 70, h: 50, texture: TextureKeys.BUILDING_HERBS, label: '\uD83C\uDF3F Herbs' },
     ];
 
     for (const b of buildings) {
@@ -316,11 +316,11 @@ export class WorldScene extends Phaser.Scene {
     }
 
     const paths = [
-      { x: 340, y: 200, w: 120, h: 12 },
-      { x: 400, y: 240, w: 12, h: 80 },
-      { x: 500, y: 300, w: 200, h: 12 },
-      { x: 200, y: 280, w: 12, h: 100 },
-      { x: 500, y: 150, w: 12, h: 60 },
+      { x: 544, y: 320, w: 192, h: 12 },
+      { x: 640, y: 384, w: 12, h: 128 },
+      { x: 800, y: 480, w: 320, h: 12 },
+      { x: 320, y: 448, w: 12, h: 160 },
+      { x: 800, y: 240, w: 12, h: 96 },
     ];
 
     for (const p of paths) {
@@ -354,6 +354,15 @@ export class WorldScene extends Phaser.Scene {
       } else {
         this.playerFacing = dy > 0 ? 'down' : 'up';
       }
+      
+      const animKey = `${TextureKeys.PLAYER}_walk_${this.playerFacing}`;
+      if (this.player.anims && this.player.anims.currentAnim?.key !== animKey) {
+        this.player.anims.play(animKey, true);
+      }
+    } else {
+      this.player.anims.stop();
+      const dirFrameMap: Record<string, number> = { down: 0, left: 3, right: 6, up: 9 };
+      this.player.setFrame(dirFrameMap[this.playerFacing] ?? 0);
     }
 
     if (dx !== 0 && dy !== 0) {
@@ -386,7 +395,7 @@ export class WorldScene extends Phaser.Scene {
       this.interactionPrompt.setText(`[E] Talk to ${closest.persona.name}`);
       this.interactionPrompt.setVisible(true);
     } else if (this.isNearShrine()) {
-      this.interactionPrompt.setPosition(400, 38);
+      this.interactionPrompt.setPosition(640, 61);
       this.interactionPrompt.setText('[E] Activate Shrine');
       this.interactionPrompt.setVisible(true);
     } else {
@@ -425,6 +434,9 @@ export class WorldScene extends Phaser.Scene {
       const npcSave = saveData.npcs[npc.persona.id];
       if (npcSave) {
         npc.memory.fromJSON(npcSave.memory);
+        if (npcSave.goals) {
+          npc.goals.fromJSON(npcSave.goals);
+        }
         npc.sprite.setPosition(npcSave.position.x, npcSave.position.y);
         npc.nameTag.setPosition(
           npcSave.position.x,
@@ -491,7 +503,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private createShrineOfDawn(): void {
-    this.shrineZone = this.add.rectangle(400, 60, 60, 40, 0xffd700, 0.3);
+    this.shrineZone = this.add.rectangle(640, 96, 60, 40, 0xffd700, 0.3);
     this.shrineZone.setDepth(3);
     this.shrineZone.setStrokeStyle(2, 0xffd700);
 
@@ -504,7 +516,7 @@ export class WorldScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
-    this.shrineLabel = this.add.text(400, 38, 'Shrine of Dawn', {
+    this.shrineLabel = this.add.text(640, 61, 'Shrine of Dawn', {
       fontSize: '10px',
       color: '#ffd700',
       stroke: '#000000',
@@ -517,9 +529,9 @@ export class WorldScene extends Phaser.Scene {
 
   private createDungeonEntrances(): void {
     const entranceDefs = [
-      { dungeonId: 'forest_cave', x: 780, y: 300, w: 40, h: 80, color: 0x1a3a0a, label: 'Forest Cave' },
-      { dungeonId: 'abandoned_mine', x: 700, y: 580, w: 80, h: 40, color: 0x3a3a3a, label: 'Abandoned Mine' },
-      { dungeonId: 'ruined_tower', x: 780, y: 80, w: 40, h: 80, color: 0x3a0a3a, label: 'Ruined Tower' },
+      { dungeonId: 'forest_cave', x: 1248, y: 480, w: 40, h: 80, color: 0x1a3a0a, label: 'Forest Cave' },
+      { dungeonId: 'abandoned_mine', x: 1120, y: 928, w: 80, h: 40, color: 0x3a3a3a, label: 'Abandoned Mine' },
+      { dungeonId: 'ruined_tower', x: 1248, y: 128, w: 40, h: 80, color: 0x3a0a3a, label: 'Ruined Tower' },
     ];
 
     for (const ent of entranceDefs) {
@@ -575,8 +587,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private isNearShrine(): boolean {
-    const dx = this.player.x - 400;
-    const dy = this.player.y - 60;
+    const dx = this.player.x - 640;
+    const dy = this.player.y - 96;
     return Math.abs(dx) < 35 && Math.abs(dy) < 25;
   }
 
@@ -667,8 +679,8 @@ export class WorldScene extends Phaser.Scene {
     const count = this.blightSystem.getWolfSpawnCount();
 
     for (let i = 0; i < count; i++) {
-      const x = GAME_WIDTH * 0.7 + Math.random() * GAME_WIDTH * 0.25;
-      const y = GAME_HEIGHT * 0.6 + Math.random() * GAME_HEIGHT * 0.35;
+      const x = GAME_WIDTH * 0.78 + Math.random() * GAME_WIDTH * 0.18; // x: 998–1229
+      const y = GAME_HEIGHT * 0.2 + Math.random() * GAME_HEIGHT * 0.55; // y: 192–720
       const wolf = new Enemy(
         this,
         x,
@@ -681,6 +693,23 @@ export class WorldScene extends Phaser.Scene {
     }
 
     EventBus.on(Events.ENTITY_DIED, (data: { entity: string; drops: { itemId: string; quantity: number }[] }) => {
+      // Visual feedback for death handled per-entity if needed, 
+      // but we can add a generic fade here if we have reference to the sprite.
+      // Since data only has entity name, we rely on the specific enemy instance logic or handle it here if we can find it.
+      // However, the instructions say "When a wolf dies... In the ENTITY_DIED handler or Enemy class".
+      // We'll iterate enemies to find the dead one that matches.
+      
+      // Actually, better to handle the fade effect right where the enemy dies or passing the sprite reference.
+      // But the Enemy class handles its own state. 
+      // Let's modify the loop in spawnEnemies to handle the fade when we detect death there or add a specific listener.
+      // Wait, the instruction said: "In the ENTITY_DIED handler or Enemy class".
+      // Let's look at where ENTITY_DIED is emitted. It's in Enemy.ts (implied).
+      // But we are in WorldScene. Let's just modify the existing listener to show the notification.
+      // The fade effect is better implemented in the Enemy class or by finding the enemy here.
+      
+      // Let's stick to the plan: "D. Enemy Death Effect: ... In the ENTITY_DIED handler or Enemy class"
+      // I will implement it in Enemy.ts instead for better encapsulation.
+      
       for (const drop of data.drops) {
         this.inventory.addItem(drop.itemId, drop.quantity);
       }
@@ -694,6 +723,8 @@ export class WorldScene extends Phaser.Scene {
     const zone = this.combatSystem.attack(this.playerFacing);
     if (!zone) return;
 
+    this.showAttackEffect(this.playerFacing);
+
     for (const enemy of this.enemies) {
       if (enemy.isDead()) continue;
       this.physics.add.overlap(
@@ -703,12 +734,61 @@ export class WorldScene extends Phaser.Scene {
           const damage = this.combatSystem.getAttackDamage(this.inventory);
           if (damage > 0) {
             enemy.takeDamage(damage);
+            this.showDamageNumber(enemy.sprite.x, enemy.sprite.y - 20, damage);
           }
         },
         undefined,
         this
       );
     }
+  }
+
+  private showAttackEffect(facing: string): void {
+    const offsets: Record<string, { x: number; y: number; angle: number }> = {
+      up: { x: 0, y: -24, angle: 0 },
+      down: { x: 0, y: 24, angle: 180 },
+      left: { x: -24, y: 0, angle: 270 },
+      right: { x: 24, y: 0, angle: 90 },
+    };
+    const offset = offsets[facing] ?? offsets.down;
+
+    const slash = this.add.graphics();
+    slash.setPosition(this.player.x + offset.x, this.player.y + offset.y);
+    slash.setDepth(50);
+
+    slash.lineStyle(3, 0xffffff, 0.8);
+    slash.beginPath();
+    slash.arc(0, 0, 16, Phaser.Math.DegToRad(offset.angle - 45), Phaser.Math.DegToRad(offset.angle + 45));
+    slash.strokePath();
+
+    this.tweens.add({
+      targets: slash,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => slash.destroy(),
+    });
+  }
+
+  private showDamageNumber(x: number, y: number, damage: number): void {
+    const dmgText = this.add.text(x, y, `-${damage}`, {
+      fontSize: '16px',
+      color: '#ff4444',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 3,
+      resolution: window.devicePixelRatio,
+    });
+    dmgText.setOrigin(0.5);
+    dmgText.setDepth(100);
+
+    this.tweens.add({
+      targets: dmgText,
+      y: y - 40,
+      alpha: 0,
+      duration: 800,
+      ease: 'Power2',
+      onComplete: () => dmgText.destroy(),
+    });
   }
 
   private checkEnemyAttacks(): void {
@@ -726,6 +806,8 @@ export class WorldScene extends Phaser.Scene {
           x: enemy.sprite.x,
           y: enemy.sprite.y,
         });
+        this.player.setTint(0xff0000);
+        this.time.delayedCall(150, () => this.player.clearTint());
       }
     }
   }

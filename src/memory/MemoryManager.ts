@@ -4,7 +4,12 @@ import {
   SocialRelationship,
   MemoryContext,
   GossipPacket,
+  SoulDocument,
+  MemoryDocument,
+  CharacterArcStage,
 } from './types';
+import { NPCPersona } from '../npc/personas';
+import { GoalSystem } from '../npc/GoalSystem';
 import { EventBus, Events } from '../world/EventBus';
 
 let memoryIdCounter = 0;
@@ -14,6 +19,9 @@ export class MemoryManager {
   private semanticMemories: Map<string, SemanticMemory> = new Map();
   private socialRelationships: Map<string, SocialRelationship> = new Map();
   private ownerId: string;
+  private soulDocument: SoulDocument | null = null;
+  private memoryDocument: MemoryDocument | null = null;
+  private previousPlayerTrust = 0.5;
 
   constructor(ownerId: string) {
     this.ownerId = ownerId;
@@ -220,6 +228,216 @@ export class MemoryManager {
     };
   }
 
+  // --- Soul & Memory Documents ---
+
+  generateSoulDocument(persona: NPCPersona): SoulDocument {
+    const identity = `${persona.name} is a ${persona.age}-year-old ${persona.role.toLowerCase()} ` +
+      `who values ${persona.values.slice(0, 2).join(' and ')} above all else.`;
+
+    this.soulDocument = {
+      name: persona.name,
+      role: persona.role,
+      age: persona.age,
+      personality: persona.personality,
+      speechStyle: persona.speechStyle,
+      backstory: persona.backstory,
+      values: [...persona.values],
+      fears: [...persona.fears],
+      coreIdentity: identity,
+    };
+
+    return this.soulDocument;
+  }
+
+  getSoulDocument(): SoulDocument | null {
+    return this.soulDocument;
+  }
+
+  updateMemoryDocument(currentDay: number): MemoryDocument {
+    const playerRel = this.socialRelationships.get('player');
+    let relationshipSummary = 'No significant relationships with the player yet.';
+    if (playerRel && playerRel.familiarity > 0) {
+      const interactionCount = this.episodicMemories.filter(
+        (m) => m.participants.includes('player')
+      ).length;
+      relationshipSummary = `Met the player ${Math.ceil(interactionCount / 2)} time(s). ` +
+        `Trust: ${(playerRel.trust * 100).toFixed(0)}%, ` +
+        `Affection: ${(playerRel.affection * 100).toFixed(0)}%, ` +
+        `Familiarity: ${(playerRel.familiarity * 100).toFixed(0)}%.`;
+      if (playerRel.notes.length > 0) {
+        relationshipSummary += ` Notes: ${playerRel.notes.slice(-3).join('; ')}.`;
+      }
+    }
+
+    const significantEvents = this.episodicMemories
+      .filter((m) => m.importance >= 0.5)
+      .sort((a, b) => b.importance - a.importance)
+      .slice(0, 10)
+      .map((m) => `Day ${m.timestamp} - ${m.summary}`);
+
+    const evolvingBeliefs: string[] = [];
+    for (const [, semantic] of this.semanticMemories) {
+      for (const belief of semantic.beliefs) {
+        evolvingBeliefs.push(
+          `${belief.fact} (confidence: ${(belief.confidence * 100).toFixed(0)}%)`
+        );
+      }
+    }
+
+    const newArc = this.evaluateCharacterArc(currentDay);
+    const existingArc = this.memoryDocument?.characterArc ?? 'opening';
+    const arcChanged = newArc !== existingArc;
+
+    this.memoryDocument = {
+      lastUpdated: currentDay,
+      relationshipSummary,
+      significantEvents,
+      evolvingBeliefs: evolvingBeliefs.slice(0, 10),
+      characterArc: newArc,
+      arcNarrative: arcChanged
+        ? this.generateArcNarrative(newArc)
+        : (this.memoryDocument?.arcNarrative ?? this.generateArcNarrative(newArc)),
+    };
+
+    return this.memoryDocument;
+  }
+
+  getMemoryDocument(): MemoryDocument | null {
+    return this.memoryDocument;
+  }
+
+  private evaluateCharacterArc(currentDay: number): CharacterArcStage {
+    const playerRel = this.socialRelationships.get('player');
+    const trustShift = playerRel
+      ? Math.abs(playerRel.trust - this.previousPlayerTrust)
+      : 0;
+
+    const highImportanceEvents = this.episodicMemories.filter(
+      (m) => m.importance > 0.8
+    ).length;
+
+    let beliefUpdateCount = 0;
+    for (const [, semantic] of this.semanticMemories) {
+      beliefUpdateCount += semantic.beliefs.length;
+    }
+
+    const interactionCount = this.episodicMemories.filter(
+      (m) => m.participants.includes('player')
+    ).length;
+
+    if (trustShift > 0.2 || highImportanceEvents >= 3) {
+      if (currentDay > 5 && beliefUpdateCount >= 5) {
+        return 'resolution';
+      }
+      return 'turning_point';
+    }
+
+    if (interactionCount >= 4 || beliefUpdateCount >= 2) {
+      return 'developing';
+    }
+
+    return 'opening';
+  }
+
+  private generateArcNarrative(stage: CharacterArcStage): string {
+    const soul = this.soulDocument;
+    const name = soul?.name ?? 'This NPC';
+    const role = soul?.role?.toLowerCase() ?? 'villager';
+
+    switch (stage) {
+      case 'opening':
+        return `${name} remains as they have always been — a ${role} following familiar routines, not yet touched by the winds of change.`;
+      case 'developing':
+        return `${name} has begun forming new connections and questioning old assumptions. The ${role}'s worldview is expanding through recent interactions.`;
+      case 'turning_point':
+        return `A significant event has shaken ${name}'s perspective. The ${role} is reassessing what matters most and what they are willing to do about it.`;
+      case 'resolution':
+        return `${name} has reached a new understanding. The ${role} has been transformed by their experiences and found a renewed sense of purpose.`;
+    }
+  }
+
+  getFullMemoryNarrative(currentDay: number, goalSystem?: GoalSystem): string {
+    const soul = this.soulDocument;
+    const memDoc = this.updateMemoryDocument(currentDay);
+    const sections: string[] = [];
+
+    // WHO I AM
+    if (soul) {
+      let whoIAm = `## WHO I AM\n`;
+      whoIAm += `I am ${soul.name}, the village ${soul.role.toLowerCase()}. `;
+      whoIAm += `I am ${soul.age} years old. ${soul.personality}\n`;
+      whoIAm += `I speak in this style: ${soul.speechStyle}\n`;
+      whoIAm += `My story: ${soul.backstory}\n`;
+      whoIAm += `I value: ${soul.values.join(', ')}. `;
+      whoIAm += `I fear: ${soul.fears.join(', ')}.`;
+      sections.push(whoIAm);
+    }
+
+    // WHAT I REMEMBER
+    let whatIRemember = `## WHAT I REMEMBER\n`;
+    whatIRemember += memDoc.relationshipSummary;
+    if (memDoc.significantEvents.length > 0) {
+      whatIRemember += `\nKey events: ${memDoc.significantEvents.join('. ')}.`;
+    }
+    if (memDoc.evolvingBeliefs.length > 0) {
+      whatIRemember += `\nMy beliefs: ${memDoc.evolvingBeliefs.join('. ')}.`;
+    }
+    sections.push(whatIRemember);
+
+    // MY CURRENT JOURNEY
+    let journey = `## MY CURRENT JOURNEY\n`;
+    journey += memDoc.arcNarrative;
+    journey += ` I am in the "${memDoc.characterArc}" stage of my arc.`;
+    sections.push(journey);
+
+    // MY GOALS
+    if (goalSystem) {
+      const goalSummary = goalSystem.getGoalSummary();
+      if (goalSummary) {
+        sections.push(`## MY GOALS\n${goalSummary}`);
+      }
+    }
+
+    return sections.join('\n\n');
+  }
+
+  trackPlayerTrust(): void {
+    const playerRel = this.socialRelationships.get('player');
+    if (playerRel) {
+      this.previousPlayerTrust = playerRel.trust;
+    }
+  }
+
+  // --- Persistent Memory (localStorage) ---
+
+  savePersistentMemory(npcId: string): void {
+    try {
+      const data = {
+        soul: this.soulDocument,
+        memoryDoc: this.memoryDocument,
+        previousPlayerTrust: this.previousPlayerTrust,
+      };
+      localStorage.setItem(`npc_persistent_${npcId}`, JSON.stringify(data));
+    } catch (e) {
+      console.error(`Failed to save persistent memory for ${npcId}:`, e);
+    }
+  }
+
+  loadPersistentMemory(npcId: string): void {
+    try {
+      const raw = localStorage.getItem(`npc_persistent_${npcId}`);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.soul) this.soulDocument = data.soul;
+      if (data.memoryDoc) this.memoryDocument = data.memoryDoc;
+      if (typeof data.previousPlayerTrust === 'number') {
+        this.previousPlayerTrust = data.previousPlayerTrust;
+      }
+    } catch (e) {
+      console.error(`Failed to load persistent memory for ${npcId}:`, e);
+    }
+  }
+
   // --- Serialization ---
 
   toJSON(): object {
@@ -228,6 +446,9 @@ export class MemoryManager {
       episodic: this.episodicMemories,
       semantic: Object.fromEntries(this.semanticMemories),
       social: Object.fromEntries(this.socialRelationships),
+      soul: this.soulDocument,
+      memoryDoc: this.memoryDocument,
+      previousPlayerTrust: this.previousPlayerTrust,
     };
   }
 
@@ -236,12 +457,17 @@ export class MemoryManager {
     episodic: EpisodicMemory[];
     semantic: Record<string, SemanticMemory>;
     social: Record<string, SocialRelationship>;
+    soul?: SoulDocument | null;
+    memoryDoc?: MemoryDocument | null;
+    previousPlayerTrust?: number;
   }): void {
     this.episodicMemories = data.episodic.map((e) => ({ ...e }));
     this.semanticMemories = new Map(Object.entries(data.semantic));
     this.socialRelationships = new Map(Object.entries(data.social));
+    this.soulDocument = data.soul ?? null;
+    this.memoryDocument = data.memoryDoc ?? null;
+    this.previousPlayerTrust = data.previousPlayerTrust ?? 0.5;
 
-    // Restore memoryIdCounter to avoid ID collisions
     let maxId = 0;
     for (const ep of this.episodicMemories) {
       const match = ep.id.match(/_(\d+)$/);
