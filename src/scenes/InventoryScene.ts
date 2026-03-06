@@ -1,10 +1,13 @@
 import Phaser from 'phaser';
 import { Inventory } from '../inventory/Inventory';
 import { ITEMS } from '../inventory/types';
+import { CombatSystem } from '../combat/CombatSystem';
+import { EventBus, Events } from '../world/EventBus';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 
 interface InventorySceneData {
   inventory: Inventory;
+  combatSystem?: CombatSystem;
 }
 
 const GRID_COLS = 5;
@@ -25,12 +28,14 @@ const TYPE_COLORS: Record<string, number> = {
 
 export class InventoryScene extends Phaser.Scene {
   private inventory!: Inventory;
+  private combatSystem: CombatSystem | null = null;
   private selectedIndex = -1;
   private itemCells: Phaser.GameObjects.Rectangle[] = [];
   private itemTexts: Phaser.GameObjects.Text[] = [];
   private qtyTexts: Phaser.GameObjects.Text[] = [];
   private descriptionText!: Phaser.GameObjects.Text;
   private equipButton!: Phaser.GameObjects.Text;
+  private useButton!: Phaser.GameObjects.Text;
   private selectionHighlight!: Phaser.GameObjects.Rectangle;
   private equippedTexts: Record<string, Phaser.GameObjects.Text> = {};
 
@@ -40,6 +45,7 @@ export class InventoryScene extends Phaser.Scene {
 
   init(data: InventorySceneData): void {
     this.inventory = data.inventory;
+    this.combatSystem = data.combatSystem ?? null;
     this.selectedIndex = -1;
     this.itemCells = [];
     this.itemTexts = [];
@@ -187,6 +193,18 @@ export class InventoryScene extends Phaser.Scene {
     this.equipButton.on('pointerdown', () => this.handleEquipClick());
     this.equipButton.on('pointerover', () => this.equipButton.setAlpha(0.8));
     this.equipButton.on('pointerout', () => this.equipButton.setAlpha(1));
+
+    this.useButton = this.add.text(GAME_WIDTH - 260, descY, '  Use  ', {
+      fontSize: '16px',
+      color: '#000000',
+      backgroundColor: '#44aaff',
+      padding: { x: 12, y: 8 },
+      resolution: window.devicePixelRatio,
+    }).setDepth(53).setInteractive().setVisible(false);
+
+    this.useButton.on('pointerdown', () => this.handleUseClick());
+    this.useButton.on('pointerover', () => this.useButton.setAlpha(0.8));
+    this.useButton.on('pointerout', () => this.useButton.setAlpha(1));
   }
 
   private selectItem(index: number): void {
@@ -196,6 +214,7 @@ export class InventoryScene extends Phaser.Scene {
       this.selectionHighlight.setVisible(false);
       this.descriptionText.setText('Select an item to see details.');
       this.equipButton.setVisible(false);
+      this.useButton.setVisible(false);
       return;
     }
 
@@ -227,6 +246,9 @@ export class InventoryScene extends Phaser.Scene {
     } else {
       this.equipButton.setVisible(false);
     }
+
+    const isUsable = def.type === 'consumable' && (def.id === 'health_potion' || def.id === 'provisions');
+    this.useButton.setVisible(isUsable);
   }
 
   private handleEquipClick(): void {
@@ -245,6 +267,32 @@ export class InventoryScene extends Phaser.Scene {
     }
 
     this.refreshDisplay();
+    this.selectItem(this.selectedIndex);
+  }
+
+  private handleUseClick(): void {
+    const items = this.inventory.getItems();
+    if (this.selectedIndex < 0 || this.selectedIndex >= items.length) return;
+
+    const slot = items[this.selectedIndex];
+    if (!this.combatSystem) {
+      EventBus.emit(Events.SHOW_NOTIFICATION, { message: 'Cannot use items right now.' });
+      return;
+    }
+
+    const success = this.combatSystem.useConsumable(slot.itemId, this.inventory);
+    if (success) {
+      const def = ITEMS[slot.itemId];
+      EventBus.emit(Events.SHOW_NOTIFICATION, { message: `Used ${def.name}. Health restored!` });
+    } else {
+      EventBus.emit(Events.SHOW_NOTIFICATION, { message: 'Health is already full!' });
+    }
+
+    this.refreshDisplay();
+    const newItems = this.inventory.getItems();
+    if (this.selectedIndex >= newItems.length) {
+      this.selectedIndex = Math.max(0, newItems.length - 1);
+    }
     this.selectItem(this.selectedIndex);
   }
 

@@ -27,10 +27,12 @@ export class TradeScene extends Phaser.Scene {
   private mode: TradeMode = 'buy';
   private selectedIndex = 0;
   private scrollOffset = 0;
+  private tradeQuantity = 1;
   private items: TradeItem[] = [];
   private listContainer!: Phaser.GameObjects.Container;
   private goldText!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text;
+  private quantityText!: Phaser.GameObjects.Text;
   private modeButtons: { buy: Phaser.GameObjects.Text; sell: Phaser.GameObjects.Text } = {
     buy: null!,
     sell: null!,
@@ -47,6 +49,7 @@ export class TradeScene extends Phaser.Scene {
     this.mode = 'buy';
     this.selectedIndex = 0;
     this.scrollOffset = 0;
+    this.tradeQuantity = 1;
   }
 
   create(): void {
@@ -98,13 +101,39 @@ export class TradeScene extends Phaser.Scene {
 
     this.listContainer = this.add.container(0, 0).setDepth(53);
 
-    this.statusText = this.add.text(cx, cy + PANEL_HEIGHT / 2 - 50, '', {
+    this.statusText = this.add.text(cx, cy + PANEL_HEIGHT / 2 - 68, '', {
       fontSize: '13px',
       color: '#44ff88',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(54);
 
-    this.add.text(cx, cy + PANEL_HEIGHT / 2 - 16, 'ESC close  |  TAB switch  |  ↑↓ select  |  ENTER trade', {
+    const qtyY = cy + PANEL_HEIGHT / 2 - 42;
+    const minusBtn = this.add.text(cx - 80, qtyY, ' − ', {
+      fontSize: '16px',
+      color: '#ffffff',
+      backgroundColor: '#333355',
+      padding: { x: 8, y: 2 },
+      resolution: window.devicePixelRatio,
+    }).setOrigin(0.5).setDepth(53).setInteractive();
+
+    this.quantityText = this.add.text(cx, qtyY, 'Qty: 1', {
+      fontSize: '14px',
+      color: '#ffffff',
+      resolution: window.devicePixelRatio,
+    }).setOrigin(0.5).setDepth(53);
+
+    const plusBtn = this.add.text(cx + 80, qtyY, ' + ', {
+      fontSize: '16px',
+      color: '#ffffff',
+      backgroundColor: '#333355',
+      padding: { x: 8, y: 2 },
+      resolution: window.devicePixelRatio,
+    }).setOrigin(0.5).setDepth(53).setInteractive();
+
+    minusBtn.on('pointerdown', () => this.adjustQuantity(-1));
+    plusBtn.on('pointerdown', () => this.adjustQuantity(1));
+
+    this.add.text(cx, cy + PANEL_HEIGHT / 2 - 16, 'ESC close | TAB switch | ↑↓ select | ←→ qty | ENTER trade', {
       fontSize: '11px',
       color: '#888888',
       resolution: window.devicePixelRatio,
@@ -121,6 +150,8 @@ export class TradeScene extends Phaser.Scene {
     });
     this.input.keyboard!.on('keydown-UP', () => this.navigate(-1));
     this.input.keyboard!.on('keydown-DOWN', () => this.navigate(1));
+    this.input.keyboard!.on('keydown-LEFT', () => this.adjustQuantity(-1));
+    this.input.keyboard!.on('keydown-RIGHT', () => this.adjustQuantity(1));
     this.input.keyboard!.on('keydown-ENTER', () => this.handleTrade());
 
     EventBus.on(Events.INVENTORY_CHANGE, this.onInventoryChange, this);
@@ -140,7 +171,9 @@ export class TradeScene extends Phaser.Scene {
     this.mode = mode;
     this.selectedIndex = 0;
     this.scrollOffset = 0;
+    this.tradeQuantity = 1;
     this.statusText.setText('');
+    this.updateQuantityDisplay();
 
     if (mode === 'buy') {
       this.modeButtons.buy.setBackgroundColor('#4488ff');
@@ -182,8 +215,34 @@ export class TradeScene extends Phaser.Scene {
       this.scrollOffset = this.selectedIndex - VISIBLE_ROWS + 1;
     }
 
+    this.tradeQuantity = 1;
+    this.updateQuantityDisplay();
     this.renderList();
     this.statusText.setText('');
+  }
+
+  private adjustQuantity(dir: number): void {
+    if (this.selectedIndex < 0 || this.selectedIndex >= this.items.length) return;
+    const item = this.items[this.selectedIndex];
+    const maxQty = item.stock;
+    if (this.mode === 'buy') {
+      const gold = this.inventory.getItemCount('gold');
+      const maxAfford = item.price > 0 ? Math.floor(gold / item.price) : maxQty;
+      this.tradeQuantity = Phaser.Math.Clamp(this.tradeQuantity + dir, 1, Math.min(maxQty, maxAfford));
+    } else {
+      this.tradeQuantity = Phaser.Math.Clamp(this.tradeQuantity + dir, 1, maxQty);
+    }
+    this.updateQuantityDisplay();
+  }
+
+  private updateQuantityDisplay(): void {
+    if (this.selectedIndex >= 0 && this.selectedIndex < this.items.length) {
+      const item = this.items[this.selectedIndex];
+      const totalPrice = item.price * this.tradeQuantity;
+      this.quantityText.setText(`Qty: ${this.tradeQuantity}  (${totalPrice}g)`);
+    } else {
+      this.quantityText.setText('Qty: 1');
+    }
   }
 
   private updateGold(): void {
@@ -301,25 +360,45 @@ export class TradeScene extends Phaser.Scene {
       return;
     }
 
-    let success: boolean;
+    let successCount = 0;
+    const qty = this.tradeQuantity;
+
     if (this.mode === 'buy') {
-      success = this.tradeSystem.buyItem(this.shop, item.itemId, 1, this.inventory, this.trust);
-      if (success) {
-        this.statusText.setText(`Bought: ${item.def.name}`);
+      for (let i = 0; i < qty; i++) {
+        if (this.tradeSystem.buyItem(this.shop, item.itemId, 1, this.inventory, this.trust)) {
+          successCount++;
+        } else {
+          break;
+        }
+      }
+      if (successCount > 0) {
+        const label = successCount > 1 ? `${item.def.name} x${successCount}` : item.def.name;
+        this.statusText.setText(`Bought: ${label}`);
         this.statusText.setColor('#44ff88');
       } else {
         this.statusText.setText('Not enough gold!');
         this.statusText.setColor('#ff6666');
       }
     } else {
-      success = this.tradeSystem.sellItem(this.shop, item.itemId, 1, this.inventory, this.trust);
-      if (success) {
-        this.statusText.setText(`Sold: ${item.def.name} for ${item.price}g`);
+      for (let i = 0; i < qty; i++) {
+        if (this.tradeSystem.sellItem(this.shop, item.itemId, 1, this.inventory, this.trust)) {
+          successCount++;
+        } else {
+          break;
+        }
+      }
+      if (successCount > 0) {
+        const totalGold = item.price * successCount;
+        const label = successCount > 1 ? `${item.def.name} x${successCount}` : item.def.name;
+        this.statusText.setText(`Sold: ${label} for ${totalGold}g`);
         this.statusText.setColor('#44ff88');
       } else {
         this.statusText.setText('Cannot sell this item.');
         this.statusText.setColor('#ff6666');
       }
     }
+
+    this.tradeQuantity = 1;
+    this.updateQuantityDisplay();
   }
 }
