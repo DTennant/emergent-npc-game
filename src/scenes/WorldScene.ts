@@ -2,20 +2,15 @@ import Phaser from 'phaser';
 import { NPC } from '../npc/NPC';
 import { NPC_PERSONAS } from '../npc/personas';
 import { GossipSystem } from '../npc/GossipSystem';
-import { LLMClient } from '../ai/LLMClient';
-import { WorldState } from '../world/WorldState';
-import { Inventory } from '../inventory/Inventory';
 import { SaveManager } from '../persistence/SaveManager';
 import { BlightSystem } from '../world/BlightSystem';
 import { EventBus, Events } from '../world/EventBus';
+import { GameState, NPCSaveState } from '../world/GameState';
 import { GossipPacket } from '../memory/types';
 import { TextureKeys } from '../assets/keys';
 import { AldricJournal, JOURNAL_PAGES } from '../story/AldricJournal';
-import { StorylineManager } from '../story/StorylineManager';
 import { CombatSystem } from '../combat/CombatSystem';
 import { HealthBar } from '../combat/HealthBar';
-import { Enemy, WOLF_CONFIG } from '../combat/Enemy';
-import { DUNGEONS } from '../dungeons/DungeonData';
 import {
   GAME_WIDTH,
   GAME_HEIGHT,
@@ -27,6 +22,24 @@ import {
   PLAYER_MAX_HEALTH,
   INVINCIBILITY_MS,
 } from '../config';
+
+interface ItemPickupDef {
+  itemId: string;
+  x: number;
+  y: number;
+  label: string;
+}
+
+interface ItemPickupInstance {
+  def: ItemPickupDef;
+  sprite: Phaser.GameObjects.Rectangle;
+  label: Phaser.GameObjects.Text;
+}
+
+interface WorldSceneInitData {
+  spawnX?: number;
+  spawnY?: number;
+}
 
 export class WorldScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
@@ -41,11 +54,9 @@ export class WorldScene extends Phaser.Scene {
     I: Phaser.Input.Keyboard.Key;
   };
   private npcs: NPC[] = [];
-  private llmClient!: LLMClient;
-  private worldState!: WorldState;
-  private inventory!: Inventory;
   private inDialogue = false;
   private inInventory = false;
+  private transitioning = false;
   private interactionPrompt!: Phaser.GameObjects.Text;
   private nearestNPC: NPC | null = null;
   private gossipSystem!: GossipSystem;
@@ -57,24 +68,25 @@ export class WorldScene extends Phaser.Scene {
   private playerFacing: string = 'down';
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private blightSystem!: BlightSystem;
-  private aldricJournal!: AldricJournal;
-  private storylineManager!: StorylineManager;
   private journalSprites: Map<string, Phaser.GameObjects.Rectangle> = new Map();
-  private enemies: Enemy[] = [];
-  private dungeonEntranceZones: Phaser.GameObjects.Zone[] = [];
   private shrineZone!: Phaser.GameObjects.Rectangle;
   private shrineLabel!: Phaser.GameObjects.Text;
+  private itemPickups: ItemPickupInstance[] = [];
+  private spawnX = GAME_WIDTH / 2;
+  private spawnY = GAME_HEIGHT / 2;
 
   constructor() {
     super({ key: 'WorldScene' });
   }
 
+  init(data?: WorldSceneInitData): void {
+    this.spawnX = data?.spawnX ?? GAME_WIDTH / 2;
+    this.spawnY = data?.spawnY ?? GAME_HEIGHT / 2;
+  }
+
   create(): void {
-    this.llmClient = new LLMClient();
-    this.worldState = new WorldState();
-    this.inventory = new Inventory();
-    this.aldricJournal = new AldricJournal();
-    this.storylineManager = new StorylineManager();
+    const gs = GameState.get(this);
+    gs.currentZone = 'village';
 
     this.createWorld();
     this.createJournalPages();
@@ -83,11 +95,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.createShrineOfDawn();
 
-    this.player = this.physics.add.sprite(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2,
-      TextureKeys.PLAYER
-    );
+    this.player = this.physics.add.sprite(this.spawnX, this.spawnY, TextureKeys.PLAYER);
     this.player.setDepth(10);
     this.player.setCollideWorldBounds(true);
 
@@ -114,51 +122,23 @@ export class WorldScene extends Phaser.Scene {
       this.npcGroup.add(npc.sprite);
     }
 
-    this.gossipSystem = new GossipSystem(this.npcs);
+    this.restoreNPCState();
 
-    this.createDungeonEntrances();
+    this.gossipSystem = new GossipSystem(this.npcs);
 
     this.physics.add.collider(this.player, this.buildingGroup);
     this.physics.add.collider(this.npcGroup, this.buildingGroup);
 
     this.restoreFromSave();
 
-    EventBus.on(Events.DAY_CHANGE, (data: { day: number }) => {
-      this.blightSystem.update(data.day);
-      this.updateBlightWorldState();
-      this.saveGame();
-    });
-    EventBus.on(Events.DIALOGUE_END, () => {
-      this.saveGame();
-    });
-    EventBus.on(Events.NPC_GOSSIP, (packet: GossipPacket) => {
-      this.trackGossipForPromotion(packet);
-    });
-    EventBus.on(Events.LLM_CONFIG_CHANGED, () => {
-      this.llmClient.reloadConfig();
-    });
+    this.createItemPickups();
 
-    EventBus.on(Events.ITEM_ACQUIRED, (data: { itemId: string }) => {
-      if (data.itemId.startsWith('aldric_journal_') && !this.storylineManager.blightAwareness) {
-        this.storylineManager.discoverBlight();
-        EventBus.emit(Events.SHOW_NOTIFICATION, {
-          message: 'You sense the truth about the Blight...',
-        });
-      }
-
-      const runestoneMap: Record<string, string> = {
-        runestone_forest: 'forest_cave',
-        runestone_mine: 'abandoned_mine',
-        runestone_tower: 'ruined_tower',
-      };
-      const dungeonId = runestoneMap[data.itemId];
-      if (dungeonId) {
-        this.storylineManager.obtainRunestone(dungeonId);
-        EventBus.emit(Events.SHOW_NOTIFICATION, {
-          message: `Runestone obtained! (${this.storylineManager.getRunestoneCount()}/3)`,
-        });
-      }
-    });
+    EventBus.on(Events.DAY_CHANGE, this.onDayChange, this);
+    EventBus.on(Events.DIALOGUE_END, this.onDialogueEnd, this);
+    EventBus.on(Events.NPC_GOSSIP, this.onNPCGossip, this);
+    EventBus.on(Events.LLM_CONFIG_CHANGED, this.onLLMConfigChanged, this);
+    EventBus.on(Events.ITEM_ACQUIRED, this.onItemAcquired, this);
+    EventBus.on(Events.PLAYER_DIED, this.onPlayerDied, this);
 
     this.combatSystem = new CombatSystem(this, this.player);
     this.playerHealthBar = new HealthBar(
@@ -169,12 +149,6 @@ export class WorldScene extends Phaser.Scene {
       4,
       PLAYER_MAX_HEALTH
     );
-
-    EventBus.on(Events.PLAYER_DIED, () => {
-      this.handlePlayerDeath();
-    });
-
-    this.spawnEnemies();
 
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = {
@@ -200,10 +174,11 @@ export class WorldScene extends Phaser.Scene {
     this.interactionPrompt.setDepth(20);
     this.interactionPrompt.setVisible(false);
 
-    this.scene.launch('HUDScene', { worldState: this.worldState, llmClient: this.llmClient });
+    this.scene.launch('HUDScene', { worldState: gs.worldState, llmClient: gs.llmClient });
 
     this.wasd.E.on('down', () => {
-      if (this.inDialogue) return;
+      if (this.inDialogue || this.transitioning) return;
+      if (this.tryPickupItem()) return;
       if (this.nearestNPC) {
         this.startDialogue(this.nearestNPC);
         return;
@@ -216,13 +191,14 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.wasd.I.on('down', () => {
-      if (this.inDialogue) return;
+      if (this.inDialogue || this.transitioning) return;
+      const gs2 = GameState.get(this);
       if (this.inInventory) {
         this.scene.stop('InventoryScene');
         this.inInventory = false;
       } else {
         this.inInventory = true;
-        this.scene.launch('InventoryScene', { inventory: this.inventory });
+        this.scene.launch('InventoryScene', { inventory: gs2.inventory });
         this.scene.get('InventoryScene').events.once('shutdown', () => {
           this.inInventory = false;
         });
@@ -230,55 +206,113 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.spaceKey.on('down', () => {
-      if (this.inDialogue) return;
+      if (this.inDialogue || this.transitioning) return;
       this.handlePlayerAttack();
     });
+
+    this.cameras.main.fadeIn(400);
   }
 
   update(_time: number, delta: number): void {
-    if (this.inDialogue) return;
+    if (this.inDialogue || this.transitioning) return;
 
-    this.worldState.update(delta);
+    const gs = GameState.get(this);
+    gs.worldState.update(delta);
 
     this.handlePlayerMovement();
 
     for (const npc of this.npcs) {
-      npc.update(delta, this.worldState);
+      npc.update(delta, gs.worldState);
     }
 
-    this.gossipSystem.update(delta, this.worldState.getDay());
-
-    for (const enemy of this.enemies) {
-      if (!enemy.isDead()) {
-        enemy.update(delta, this.player.x, this.player.y);
-      }
-    }
-
-    this.checkEnemyAttacks();
+    this.gossipSystem.update(delta, gs.worldState.getDay());
 
     this.checkNPCProximity();
+    this.checkZoneExit();
 
     this.playerLabel.setPosition(this.player.x, this.player.y - TILE_SIZE * 0.7);
-
     this.playerHealthBar.setPosition(this.player.x, this.player.y - TILE_SIZE);
     this.playerHealthBar.setHealth(this.combatSystem.getHealth());
   }
 
+  shutdown(): void {
+    this.cleanupEvents();
+  }
+
+  private cleanupEvents(): void {
+    EventBus.off(Events.DAY_CHANGE, this.onDayChange, this);
+    EventBus.off(Events.DIALOGUE_END, this.onDialogueEnd, this);
+    EventBus.off(Events.NPC_GOSSIP, this.onNPCGossip, this);
+    EventBus.off(Events.LLM_CONFIG_CHANGED, this.onLLMConfigChanged, this);
+    EventBus.off(Events.ITEM_ACQUIRED, this.onItemAcquired, this);
+    EventBus.off(Events.PLAYER_DIED, this.onPlayerDied, this);
+  }
+
+  private onDayChange(data: { day: number }): void {
+    this.blightSystem.update(data.day);
+    this.updateBlightWorldState();
+    this.saveGame();
+  }
+
+  private onDialogueEnd(): void {
+    this.saveGame();
+  }
+
+  private onNPCGossip(packet: GossipPacket): void {
+    this.trackGossipForPromotion(packet);
+  }
+
+  private onLLMConfigChanged(): void {
+    const gs = GameState.get(this);
+    gs.llmClient.reloadConfig();
+  }
+
+  private onItemAcquired(data: { itemId: string }): void {
+    const gs = GameState.get(this);
+    if (data.itemId.startsWith('aldric_journal_') && !gs.storylineManager.blightAwareness) {
+      gs.storylineManager.discoverBlight();
+      EventBus.emit(Events.SHOW_NOTIFICATION, {
+        message: 'You sense the truth about the Blight...',
+      });
+    }
+
+    const runestoneMap: Record<string, string> = {
+      runestone_forest: 'forest_cave',
+      runestone_mine: 'abandoned_mine',
+      runestone_tower: 'ruined_tower',
+    };
+    const dungeonId = runestoneMap[data.itemId];
+    if (dungeonId) {
+      gs.storylineManager.obtainRunestone(dungeonId);
+      EventBus.emit(Events.SHOW_NOTIFICATION, {
+        message: `Runestone obtained! (${gs.storylineManager.getRunestoneCount()}/3)`,
+      });
+    }
+  }
+
+  private onPlayerDied(): void {
+    this.handlePlayerDeath();
+  }
+
   private createWorld(): void {
+    const grassTiles = ['tile_grass', 'tile_grass2', 'tile_grass3', 'tile_grass4'];
+    const hasTileset = grassTiles.some((k) => this.textures.exists(k));
+
     for (let x = 0; x < GAME_WIDTH; x += TILE_SIZE) {
       for (let y = 0; y < GAME_HEIGHT; y += TILE_SIZE) {
-        const shade = 0.9 + Math.random() * 0.2;
-        const r = Math.floor(((COLORS.grass >> 16) & 0xff) * shade);
-        const g = Math.floor(((COLORS.grass >> 8) & 0xff) * shade);
-        const b = Math.floor((COLORS.grass & 0xff) * shade);
-        const color = (r << 16) | (g << 8) | b;
-        this.add.rectangle(
-          x + TILE_SIZE / 2,
-          y + TILE_SIZE / 2,
-          TILE_SIZE,
-          TILE_SIZE,
-          color
-        ).setDepth(0);
+        if (hasTileset) {
+          const tileKey = grassTiles[Math.floor(Math.random() * grassTiles.length)];
+          const tile = this.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, tileKey);
+          tile.setScale(2);
+          tile.setDepth(0);
+        } else {
+          const shade = 0.9 + Math.random() * 0.2;
+          const r = Math.floor(((COLORS.grass >> 16) & 0xff) * shade);
+          const g = Math.floor(((COLORS.grass >> 8) & 0xff) * shade);
+          const b = Math.floor((COLORS.grass & 0xff) * shade);
+          const color = (r << 16) | (g << 8) | b;
+          this.add.rectangle(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE, TILE_SIZE, color).setDepth(0);
+        }
       }
     }
 
@@ -296,12 +330,8 @@ export class WorldScene extends Phaser.Scene {
     for (const b of buildings) {
       const bldg = this.buildingGroup.create(b.x, b.y, b.texture) as Phaser.Physics.Arcade.Sprite;
       bldg.setDepth(1);
-
       const body = bldg.body as Phaser.Physics.Arcade.StaticBody;
-      body.setSize(
-        b.w * BUILDING_COLLISION_PADDING,
-        b.h * BUILDING_COLLISION_PADDING
-      );
+      body.setSize(b.w * BUILDING_COLLISION_PADDING, b.h * BUILDING_COLLISION_PADDING);
 
       this.add
         .text(b.x, b.y - b.h / 2 - 8, b.label, {
@@ -324,7 +354,13 @@ export class WorldScene extends Phaser.Scene {
     ];
 
     for (const p of paths) {
-      this.add.rectangle(p.x, p.y, p.w, p.h, COLORS.path, 0.6).setDepth(0);
+      if (this.textures.exists('tile_path')) {
+        const pathTile = this.add.image(p.x, p.y, 'tile_path');
+        pathTile.setScale(p.w / 16, p.h / 16);
+        pathTile.setDepth(0);
+      } else {
+        this.add.rectangle(p.x, p.y, p.w, p.h, COLORS.path, 0.6).setDepth(0);
+      }
     }
 
     this.add
@@ -337,6 +373,23 @@ export class WorldScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(15);
+
+    const exitHint = this.add.text(GAME_WIDTH - 10, GAME_HEIGHT / 2, '\u2192 Dark Woods', {
+      fontSize: '11px',
+      color: '#aaffaa',
+      stroke: '#000000',
+      strokeThickness: 2,
+      resolution: window.devicePixelRatio,
+    });
+    exitHint.setOrigin(1, 0.5);
+    exitHint.setDepth(15);
+    this.tweens.add({
+      targets: exitHint,
+      alpha: { from: 0.4, to: 1.0 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+    });
   }
 
   private handlePlayerMovement(): void {
@@ -354,7 +407,7 @@ export class WorldScene extends Phaser.Scene {
       } else {
         this.playerFacing = dy > 0 ? 'down' : 'up';
       }
-      
+
       const animKey = `${TextureKeys.PLAYER}_walk_${this.playerFacing}`;
       if (this.player.anims && this.player.anims.currentAnim?.key !== animKey) {
         this.player.anims.play(animKey, true);
@@ -388,10 +441,7 @@ export class WorldScene extends Phaser.Scene {
     this.nearestNPC = closest;
 
     if (closest) {
-      this.interactionPrompt.setPosition(
-        closest.sprite.x,
-        closest.sprite.y - TILE_SIZE * 1.2
-      );
+      this.interactionPrompt.setPosition(closest.sprite.x, closest.sprite.y - TILE_SIZE * 1.2);
       this.interactionPrompt.setText(`[E] Talk to ${closest.persona.name}`);
       this.interactionPrompt.setVisible(true);
     } else if (this.isNearShrine()) {
@@ -401,34 +451,189 @@ export class WorldScene extends Phaser.Scene {
     } else {
       const nearPage = this.getNearbyJournalPage();
       if (nearPage) {
-        this.interactionPrompt.setPosition(
-          nearPage.position.x,
-          nearPage.position.y - 20
-        );
+        this.interactionPrompt.setPosition(nearPage.position.x, nearPage.position.y - 20);
         this.interactionPrompt.setText('[E] Pick up journal page');
         this.interactionPrompt.setVisible(true);
       } else {
-        this.interactionPrompt.setVisible(false);
+        const nearItem = this.getNearbyItemPickup();
+        if (nearItem) {
+          this.interactionPrompt.setPosition(nearItem.def.x, nearItem.def.y - 24);
+          this.interactionPrompt.setText(`[E] Pick up ${nearItem.def.label}`);
+          this.interactionPrompt.setVisible(true);
+        } else {
+          this.interactionPrompt.setVisible(false);
+        }
       }
     }
   }
 
+  private checkZoneExit(): void {
+    if (this.transitioning) return;
+    if (this.player.x > GAME_WIDTH - 40) {
+      this.player.setVelocity(0, 0);
+      this.showZonePrompt('Enter the Dark Woods?', () => {
+        this.saveNPCState();
+        this.saveGame();
+        this.cleanupEvents();
+        this.scene.stop('HUDScene');
+        this.cameras.main.fadeOut(400);
+        this.time.delayedCall(400, () => {
+          this.scene.start('WoodsScene', {
+            spawnX: 60,
+            spawnY: this.player.y,
+          });
+        });
+      });
+    }
+  }
+
+  private showZonePrompt(message: string, onConfirm: () => void): void {
+    this.transitioning = true;
+    const bg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 400, 150, 0x000000, 0.85);
+    bg.setDepth(200);
+    const text = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 25, message, {
+      fontSize: '18px',
+      color: '#ffffff',
+      align: 'center',
+      resolution: window.devicePixelRatio,
+    }).setOrigin(0.5).setDepth(201);
+    const hint = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 20, '[Y] Yes    [N] No', {
+      fontSize: '14px',
+      color: '#aaaaaa',
+      resolution: window.devicePixelRatio,
+    }).setOrigin(0.5).setDepth(201);
+
+    const yKey = this.input.keyboard!.addKey('Y');
+    const nKey = this.input.keyboard!.addKey('N');
+
+    const cleanup = () => {
+      bg.destroy();
+      text.destroy();
+      hint.destroy();
+      yKey.removeAllListeners();
+      nKey.removeAllListeners();
+      this.input.keyboard!.removeKey('Y');
+      this.input.keyboard!.removeKey('N');
+    };
+
+    yKey.once('down', () => {
+      cleanup();
+      onConfirm();
+    });
+    nKey.once('down', () => {
+      cleanup();
+      this.transitioning = false;
+      this.player.setPosition(GAME_WIDTH - 80, this.player.y);
+    });
+  }
+
+  private saveNPCState(): void {
+    const gs = GameState.get(this);
+    for (const npc of this.npcs) {
+      gs.npcData.set(npc.persona.id, {
+        memory: npc.memory.toJSON() as NPCSaveState['memory'],
+        goals: npc.goals.toJSON(),
+        position: { x: npc.sprite.x, y: npc.sprite.y },
+      });
+    }
+  }
+
+  private restoreNPCState(): void {
+    const gs = GameState.get(this);
+    for (const npc of this.npcs) {
+      const saved = gs.npcData.get(npc.persona.id);
+      if (saved) {
+        npc.memory.fromJSON(saved.memory);
+        npc.goals.fromJSON(saved.goals);
+        npc.sprite.setPosition(saved.position.x, saved.position.y);
+        npc.nameTag.setPosition(saved.position.x, saved.position.y - TILE_SIZE * 0.7);
+      }
+    }
+  }
+
+  private createItemPickups(): void {
+    const gs = GameState.get(this);
+    const pickups: ItemPickupDef[] = [
+      { itemId: 'wooden_sword', x: 1100, y: 480, label: 'Wooden Sword' },
+      { itemId: 'health_potion', x: 680, y: 130, label: 'Health Potion' },
+    ];
+
+    for (const def of pickups) {
+      if (gs.inventory.hasItem(def.itemId)) continue;
+
+      const sprite = this.add.rectangle(def.x, def.y, 16, 16, 0xffdd44);
+      sprite.setDepth(5);
+      this.tweens.add({
+        targets: sprite,
+        alpha: { from: 0.5, to: 1.0 },
+        scaleX: { from: 0.8, to: 1.2 },
+        scaleY: { from: 0.8, to: 1.2 },
+        duration: 800,
+        yoyo: true,
+        repeat: -1,
+      });
+
+      const label = this.add.text(def.x, def.y - 16, def.label, {
+        fontSize: '9px',
+        color: '#ffdd44',
+        stroke: '#000000',
+        strokeThickness: 2,
+        resolution: window.devicePixelRatio,
+      }).setOrigin(0.5).setDepth(6);
+
+      this.itemPickups.push({ def, sprite, label });
+    }
+  }
+
+  private getNearbyItemPickup(): ItemPickupInstance | null {
+    for (const pickup of this.itemPickups) {
+      const dx = this.player.x - pickup.def.x;
+      const dy = this.player.y - pickup.def.y;
+      if (Math.sqrt(dx * dx + dy * dy) < INTERACTION_DISTANCE) {
+        return pickup;
+      }
+    }
+    return null;
+  }
+
+  private tryPickupItem(): boolean {
+    const gs = GameState.get(this);
+    for (let i = this.itemPickups.length - 1; i >= 0; i--) {
+      const pickup = this.itemPickups[i];
+      const dx = this.player.x - pickup.def.x;
+      const dy = this.player.y - pickup.def.y;
+      if (Math.sqrt(dx * dx + dy * dy) < INTERACTION_DISTANCE) {
+        gs.inventory.addItem(pickup.def.itemId);
+        this.tweens.killTweensOf(pickup.sprite);
+        pickup.sprite.destroy();
+        pickup.label.destroy();
+        this.itemPickups.splice(i, 1);
+        EventBus.emit(Events.SHOW_NOTIFICATION, { message: `Picked up: ${pickup.def.label}` });
+        return true;
+      }
+    }
+    return false;
+  }
+
   private saveGame(): void {
-    this.worldState.blightSystemData = this.blightSystem.toJSON();
-    this.worldState.storylineData = this.storylineManager.toJSON();
+    const gs = GameState.get(this);
+    gs.worldState.blightSystemData = this.blightSystem.toJSON();
+    gs.worldState.storylineData = gs.storylineManager.toJSON();
     SaveManager.save(
-      this.worldState,
+      gs.worldState,
       this.npcs,
-      this.inventory,
-      { x: this.player.x, y: this.player.y }
+      gs.inventory,
+      { x: this.player.x, y: this.player.y },
+      gs.currentZone
     );
   }
 
   private restoreFromSave(): void {
+    const gs = GameState.get(this);
     const saveData = SaveManager.load();
     if (!saveData) return;
 
-    this.worldState.fromJSON(saveData.world);
+    gs.worldState.fromJSON(saveData.world);
 
     for (const npc of this.npcs) {
       const npcSave = saveData.npcs[npc.persona.id];
@@ -438,28 +643,28 @@ export class WorldScene extends Phaser.Scene {
           npc.goals.fromJSON(npcSave.goals);
         }
         npc.sprite.setPosition(npcSave.position.x, npcSave.position.y);
-        npc.nameTag.setPosition(
-          npcSave.position.x,
-          npcSave.position.y - TILE_SIZE * 0.7
-        );
+        npc.nameTag.setPosition(npcSave.position.x, npcSave.position.y - TILE_SIZE * 0.7);
       }
     }
 
-    this.inventory.fromJSON(saveData.inventory);
+    gs.inventory.fromJSON(saveData.inventory);
 
     if (saveData.world.blightSystem) {
       this.blightSystem.fromJSON(saveData.world.blightSystem);
     }
 
     if (saveData.world.storyline) {
-      this.storylineManager.fromJSON(saveData.world.storyline);
+      gs.storylineManager.fromJSON(saveData.world.storyline);
     }
 
-    this.player.setPosition(saveData.player.x, saveData.player.y);
-    this.playerLabel.setPosition(saveData.player.x, saveData.player.y - TILE_SIZE * 0.7);
+    if (!this.spawnX || this.spawnX === GAME_WIDTH / 2) {
+      this.player.setPosition(saveData.player.x, saveData.player.y);
+      this.playerLabel.setPosition(saveData.player.x, saveData.player.y - TILE_SIZE * 0.7);
+    }
   }
 
   private trackGossipForPromotion(packet: GossipPacket): void {
+    const gs = GameState.get(this);
     const key = `${packet.subject}::${packet.content}`;
     const knowers = this.gossipTracker.get(key) ?? new Set<string>();
     knowers.add(packet.from);
@@ -467,28 +672,22 @@ export class WorldScene extends Phaser.Scene {
     this.gossipTracker.set(key, knowers);
 
     if (knowers.size >= 3) {
-      this.worldState.villageMemory.promoteFromGossip(
+      gs.worldState.villageMemory.promoteFromGossip(
         packet.subject,
         packet.content,
         Array.from(knowers),
-        this.worldState.getDay()
+        gs.worldState.getDay()
       );
     }
   }
 
   private createJournalPages(): void {
+    const gs = GameState.get(this);
     for (const page of JOURNAL_PAGES) {
-      if (this.aldricJournal.isDiscovered(page.id)) continue;
+      if (gs.aldricJournal.isDiscovered(page.id)) continue;
 
-      const rect = this.add.rectangle(
-        page.position.x,
-        page.position.y,
-        12,
-        16,
-        0xffd700
-      );
+      const rect = this.add.rectangle(page.position.x, page.position.y, 12, 16, 0xffd700);
       rect.setDepth(3);
-
       this.tweens.add({
         targets: rect,
         alpha: { from: 0.6, to: 1.0 },
@@ -497,7 +696,6 @@ export class WorldScene extends Phaser.Scene {
         repeat: -1,
         ease: 'Sine.easeInOut',
       });
-
       this.journalSprites.set(page.id, rect);
     }
   }
@@ -506,7 +704,6 @@ export class WorldScene extends Phaser.Scene {
     this.shrineZone = this.add.rectangle(640, 96, 60, 40, 0xffd700, 0.3);
     this.shrineZone.setDepth(3);
     this.shrineZone.setStrokeStyle(2, 0xffd700);
-
     this.tweens.add({
       targets: this.shrineZone,
       alpha: { from: 0.2, to: 0.5 },
@@ -527,65 +724,6 @@ export class WorldScene extends Phaser.Scene {
     this.shrineLabel.setDepth(4);
   }
 
-  private createDungeonEntrances(): void {
-    const entranceDefs = [
-      { dungeonId: 'forest_cave', x: 1248, y: 480, w: 40, h: 80, color: 0x1a3a0a, label: 'Forest Cave' },
-      { dungeonId: 'abandoned_mine', x: 1120, y: 928, w: 80, h: 40, color: 0x3a3a3a, label: 'Abandoned Mine' },
-      { dungeonId: 'ruined_tower', x: 1248, y: 128, w: 40, h: 80, color: 0x3a0a3a, label: 'Ruined Tower' },
-    ];
-
-    for (const ent of entranceDefs) {
-      const dungeon = DUNGEONS.find((d) => d.id === ent.dungeonId);
-      if (!dungeon) continue;
-
-      const rect = this.add.rectangle(ent.x, ent.y, ent.w, ent.h, ent.color, 0.7);
-      rect.setDepth(1);
-      rect.setStrokeStyle(2, 0xffffff, 0.3);
-
-      const label = this.add.text(ent.x, ent.y - ent.h / 2 - 10, ent.label, {
-        fontSize: '9px',
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 2,
-        resolution: window.devicePixelRatio,
-      });
-      label.setOrigin(0.5);
-      label.setDepth(15);
-
-      const zone = this.add.zone(ent.x, ent.y, ent.w, ent.h);
-      this.physics.add.existing(zone, true);
-      this.dungeonEntranceZones.push(zone);
-
-      this.physics.add.overlap(
-        this.player,
-        zone,
-        () => {
-          this.tryEnterDungeon(dungeon.id, dungeon.requiredItem, dungeon.name);
-        },
-        undefined,
-        this
-      );
-    }
-  }
-
-  private tryEnterDungeon(dungeonId: string, requiredItem: string, dungeonName: string): void {
-    if (this.inDialogue || this.inInventory) return;
-
-    if (!this.inventory.hasItem(requiredItem)) {
-      EventBus.emit(Events.SHOW_NOTIFICATION, {
-        message: `You need a ${requiredItem.replace('_', ' ')} to enter ${dungeonName}.`,
-      });
-      const pushback = 40;
-      this.player.setPosition(this.player.x - pushback, this.player.y);
-      return;
-    }
-
-    this.scene.start('DungeonScene', {
-      dungeonId,
-      inventory: this.inventory,
-    });
-  }
-
   private isNearShrine(): boolean {
     const dx = this.player.x - 640;
     const dy = this.player.y - 96;
@@ -594,16 +732,17 @@ export class WorldScene extends Phaser.Scene {
 
   private tryActivateShrine(): void {
     if (!this.isNearShrine()) return;
+    const gs = GameState.get(this);
 
-    if (this.storylineManager.shrineActivated) {
+    if (gs.storylineManager.shrineActivated) {
       EventBus.emit(Events.SHOW_NOTIFICATION, {
         message: 'The Shrine of Dawn glows with peaceful light. The Blight is sealed.',
       });
       return;
     }
 
-    if (this.storylineManager.canActivateShrine()) {
-      this.storylineManager.activateShrine();
+    if (gs.storylineManager.canActivateShrine()) {
+      gs.storylineManager.activateShrine();
       this.blightSystem.seal();
       this.updateBlightWorldState();
 
@@ -615,7 +754,7 @@ export class WorldScene extends Phaser.Scene {
         message: 'The Shrine of Dawn blazes with golden light! The Blight is sealed forever!',
       });
     } else {
-      const count = this.storylineManager.getRunestoneCount();
+      const count = gs.storylineManager.getRunestoneCount();
       EventBus.emit(Events.SHOW_NOTIFICATION, {
         message: `You need all 3 Runestones to activate the Shrine. (${count}/3 found)`,
       });
@@ -623,12 +762,12 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private getNearbyJournalPage(): typeof JOURNAL_PAGES[number] | null {
+    const gs = GameState.get(this);
     for (const page of JOURNAL_PAGES) {
-      if (this.aldricJournal.isDiscovered(page.id)) continue;
+      if (gs.aldricJournal.isDiscovered(page.id)) continue;
       const dx = this.player.x - page.position.x;
       const dy = this.player.y - page.position.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < INTERACTION_DISTANCE) {
+      if (Math.sqrt(dx * dx + dy * dy) < INTERACTION_DISTANCE) {
         return page;
       }
     }
@@ -636,11 +775,12 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private tryPickupJournalPage(): void {
+    const gs = GameState.get(this);
     const page = this.getNearbyJournalPage();
     if (!page) return;
 
-    this.aldricJournal.discoverPage(page.id);
-    this.inventory.addItem(page.id);
+    gs.aldricJournal.discoverPage(page.id);
+    gs.inventory.addItem(page.id);
 
     const sprite = this.journalSprites.get(page.id);
     if (sprite) {
@@ -649,15 +789,14 @@ export class WorldScene extends Phaser.Scene {
       this.journalSprites.delete(page.id);
     }
 
-    EventBus.emit(Events.SHOW_NOTIFICATION, {
-      message: `Found: ${page.title}`,
-    });
+    EventBus.emit(Events.SHOW_NOTIFICATION, { message: `Found: ${page.title}` });
   }
 
   private updateBlightWorldState(): void {
+    const gs = GameState.get(this);
     const intensity = this.blightSystem.getIntensity();
-    this.worldState.village.blightIntensity = intensity;
-    this.worldState.village.safety = Math.max(0, 0.8 - intensity * 0.6);
+    gs.worldState.village.blightIntensity = intensity;
+    gs.worldState.village.safety = Math.max(0, 0.8 - intensity * 0.6);
 
     const blightFacts: string[] = [];
     if (intensity > 0.2) blightFacts.push('Dark tendrils creep from the Ancient Forest');
@@ -665,82 +804,20 @@ export class WorldScene extends Phaser.Scene {
     if (intensity > 0.6) blightFacts.push('The Blight visibly darkens the eastern sky');
     if (intensity > 0.8) blightFacts.push('Thornwick is in grave danger from the spreading darkness');
 
-    this.worldState.worldFacts = this.worldState.worldFacts.filter(
+    gs.worldState.worldFacts = gs.worldState.worldFacts.filter(
       (f) =>
         f !== 'Dark tendrils creep from the Ancient Forest' &&
         f !== 'Corrupted wolves roam closer to the village' &&
         f !== 'The Blight visibly darkens the eastern sky' &&
         f !== 'Thornwick is in grave danger from the spreading darkness'
     );
-    this.worldState.worldFacts.push(...blightFacts);
-  }
-
-  private spawnEnemies(): void {
-    const count = this.blightSystem.getWolfSpawnCount();
-
-    for (let i = 0; i < count; i++) {
-      const x = GAME_WIDTH * 0.78 + Math.random() * GAME_WIDTH * 0.18; // x: 998–1229
-      const y = GAME_HEIGHT * 0.2 + Math.random() * GAME_HEIGHT * 0.55; // y: 192–720
-      const wolf = new Enemy(
-        this,
-        x,
-        y,
-        TextureKeys.ENEMY_WOLF,
-        WOLF_CONFIG
-      );
-      this.physics.add.collider(wolf.sprite, this.buildingGroup);
-      this.enemies.push(wolf);
-    }
-
-    EventBus.on(Events.ENTITY_DIED, (data: { entity: string; drops: { itemId: string; quantity: number }[] }) => {
-      // Visual feedback for death handled per-entity if needed, 
-      // but we can add a generic fade here if we have reference to the sprite.
-      // Since data only has entity name, we rely on the specific enemy instance logic or handle it here if we can find it.
-      // However, the instructions say "When a wolf dies... In the ENTITY_DIED handler or Enemy class".
-      // We'll iterate enemies to find the dead one that matches.
-      
-      // Actually, better to handle the fade effect right where the enemy dies or passing the sprite reference.
-      // But the Enemy class handles its own state. 
-      // Let's modify the loop in spawnEnemies to handle the fade when we detect death there or add a specific listener.
-      // Wait, the instruction said: "In the ENTITY_DIED handler or Enemy class".
-      // Let's look at where ENTITY_DIED is emitted. It's in Enemy.ts (implied).
-      // But we are in WorldScene. Let's just modify the existing listener to show the notification.
-      // The fade effect is better implemented in the Enemy class or by finding the enemy here.
-      
-      // Let's stick to the plan: "D. Enemy Death Effect: ... In the ENTITY_DIED handler or Enemy class"
-      // I will implement it in Enemy.ts instead for better encapsulation.
-      
-      for (const drop of data.drops) {
-        this.inventory.addItem(drop.itemId, drop.quantity);
-      }
-      EventBus.emit(Events.SHOW_NOTIFICATION, {
-        message: `${data.entity} defeated!`,
-      });
-    });
+    gs.worldState.worldFacts.push(...blightFacts);
   }
 
   private handlePlayerAttack(): void {
     const zone = this.combatSystem.attack(this.playerFacing);
     if (!zone) return;
-
     this.showAttackEffect(this.playerFacing);
-
-    for (const enemy of this.enemies) {
-      if (enemy.isDead()) continue;
-      this.physics.add.overlap(
-        zone,
-        enemy.sprite,
-        () => {
-          const damage = this.combatSystem.getAttackDamage(this.inventory);
-          if (damage > 0) {
-            enemy.takeDamage(damage);
-            this.showDamageNumber(enemy.sprite.x, enemy.sprite.y - 20, damage);
-          }
-        },
-        undefined,
-        this
-      );
-    }
   }
 
   private showAttackEffect(facing: string): void {
@@ -755,7 +832,6 @@ export class WorldScene extends Phaser.Scene {
     const slash = this.add.graphics();
     slash.setPosition(this.player.x + offset.x, this.player.y + offset.y);
     slash.setDepth(50);
-
     slash.lineStyle(3, 0xffffff, 0.8);
     slash.beginPath();
     slash.arc(0, 0, 16, Phaser.Math.DegToRad(offset.angle - 45), Phaser.Math.DegToRad(offset.angle + 45));
@@ -769,70 +845,28 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  private showDamageNumber(x: number, y: number, damage: number): void {
-    const dmgText = this.add.text(x, y, `-${damage}`, {
-      fontSize: '16px',
-      color: '#ff4444',
-      fontStyle: 'bold',
-      stroke: '#000000',
-      strokeThickness: 3,
-      resolution: window.devicePixelRatio,
-    });
-    dmgText.setOrigin(0.5);
-    dmgText.setDepth(100);
-
-    this.tweens.add({
-      targets: dmgText,
-      y: y - 40,
-      alpha: 0,
-      duration: 800,
-      ease: 'Power2',
-      onComplete: () => dmgText.destroy(),
-    });
-  }
-
-  private checkEnemyAttacks(): void {
-    for (const enemy of this.enemies) {
-      if (enemy.isDead()) continue;
-      if (!enemy.canAttack()) continue;
-
-      const dx = this.player.x - enemy.sprite.x;
-      const dy = this.player.y - enemy.sprite.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist <= TILE_SIZE) {
-        const config = enemy.getConfig();
-        this.combatSystem.handlePlayerDamage(config.damage, {
-          x: enemy.sprite.x,
-          y: enemy.sprite.y,
-        });
-        this.player.setTint(0xff0000);
-        this.time.delayedCall(150, () => this.player.clearTint());
-      }
-    }
-  }
-
   private startDialogue(npc: NPC): void {
+    const gs = GameState.get(this);
     this.inDialogue = true;
     npc.isInDialogue = true;
-    this.worldState.pause();
+    gs.worldState.pause();
     this.interactionPrompt.setVisible(false);
 
     EventBus.emit(Events.DIALOGUE_START, {
       npc,
-      llmClient: this.llmClient,
-      worldState: this.worldState,
+      llmClient: gs.llmClient,
+      worldState: gs.worldState,
     });
 
     this.scene.launch('DialogueScene', {
       npc,
-      llmClient: this.llmClient,
-      worldState: this.worldState,
-      storylineManager: this.storylineManager,
+      llmClient: gs.llmClient,
+      worldState: gs.worldState,
+      storylineManager: gs.storylineManager,
       onClose: () => {
         this.inDialogue = false;
         npc.isInDialogue = false;
-        this.worldState.resume();
+        gs.worldState.resume();
         EventBus.emit(Events.DIALOGUE_END, { npcId: npc.persona.id });
       },
     });
@@ -840,7 +874,6 @@ export class WorldScene extends Phaser.Scene {
 
   private handlePlayerDeath(): void {
     this.combatSystem.resetHealth();
-
     this.player.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
     this.playerLabel.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2 - TILE_SIZE * 0.7);
     this.playerHealthBar.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2 - TILE_SIZE);
