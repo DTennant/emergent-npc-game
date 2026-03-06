@@ -131,8 +131,12 @@ export class HUDScene extends Phaser.Scene {
     settingsBtn.on('pointerover', () => settingsBtn.setScale(1.1));
     settingsBtn.on('pointerout', () => settingsBtn.setScale(1));
 
-    EventBus.on(Events.SHOW_NOTIFICATION, (data: { text: string }) => {
-      this.showNotification(data.text);
+    EventBus.on(Events.SHOW_NOTIFICATION, (data: string | { message?: string; text?: string }) => {
+      if (typeof data === 'string') {
+        this.showNotification(data);
+      } else {
+        this.showNotification(data.message ?? data.text ?? '');
+      }
     });
 
     EventBus.on(Events.DIALOGUE_START, (data: { npc: { persona: { name: string } } }) => {
