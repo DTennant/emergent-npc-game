@@ -57,7 +57,7 @@ export class DungeonScene extends Phaser.Scene {
   init(data: DungeonInitData): void {
     const def = DUNGEONS.find((d) => d.id === data.dungeonId);
     if (!def) {
-      this.scene.start('WorldScene');
+      this.scene.start('WoodsScene');
       return;
     }
     this.dungeonDef = def;
@@ -411,7 +411,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private exitDungeon(): void {
     this.cleanup();
-    this.scene.start('WorldScene');
+    this.scene.start('WoodsScene', { spawnX: GAME_WIDTH / 2, spawnY: GAME_HEIGHT / 2 });
   }
 
   private cleanup(): void {

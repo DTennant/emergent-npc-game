@@ -5,6 +5,7 @@ import { DialogueScene } from './scenes/DialogueScene';
 import { HUDScene } from './scenes/HUDScene';
 import { InventoryScene } from './scenes/InventoryScene';
 import { DungeonScene } from './scenes/DungeonScene';
+import { WoodsScene } from './scenes/WoodsScene';
 import { SettingsScene } from './scenes/SettingsScene';
 import { GAME_WIDTH, GAME_HEIGHT } from './config';
 
@@ -33,7 +34,7 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true,
   },
-  scene: [BootScene, WorldScene, DialogueScene, HUDScene, InventoryScene, DungeonScene, SettingsScene],
+  scene: [BootScene, WorldScene, WoodsScene, DialogueScene, HUDScene, InventoryScene, DungeonScene, SettingsScene],
 };
 
 new Phaser.Game(config);

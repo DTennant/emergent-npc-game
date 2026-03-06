@@ -26,6 +26,7 @@ export interface SaveData {
   npcs: Record<string, NPCSaveData>;
   inventory: InventorySaveData;
   player: { x: number; y: number };
+  currentZone?: 'village' | 'woods' | 'dungeon';
 }
 
 const SAVE_KEY = 'game_save';
@@ -36,7 +37,8 @@ export class SaveManager {
     worldState: WorldState,
     npcs: NPC[],
     inventory: Inventory,
-    playerPosition: { x: number; y: number }
+    playerPosition: { x: number; y: number },
+    currentZone: 'village' | 'woods' | 'dungeon' = 'village'
   ): void {
     const npcData: Record<string, NPCSaveData> = {};
     for (const npc of npcs) {
@@ -54,6 +56,7 @@ export class SaveManager {
       npcs: npcData,
       inventory: inventory.toJSON(),
       player: { x: playerPosition.x, y: playerPosition.y },
+      currentZone,
     };
 
     try {
