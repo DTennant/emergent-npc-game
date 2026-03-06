@@ -26,10 +26,11 @@ export interface WorldStateJSON {
 }
 
 export class WorldState {
-  private gameTime = 0; // in-game minutes (0 = 6:00 AM)
+  private gameTime = 0; // in-game minutes since cycle start
   private day = 1;
   private elapsedMs = 0;
   private paused = false;
+  private prevHour = 6;
 
   public village: VillageState = {
     name: 'Thornwick',
@@ -63,21 +64,20 @@ export class WorldState {
 
     this.elapsedMs += delta;
 
-    // Convert real time to game time
-    const minutesPerMs = (24 * 60) / DAY_LENGTH_MS;
     const newGameTime = Math.floor(((this.elapsedMs % DAY_LENGTH_MS) / DAY_LENGTH_MS) * 24 * 60);
+    this.gameTime = newGameTime;
 
-    if (newGameTime < this.gameTime) {
-      // Day rolled over
+    const currentHour = this.getHour();
+    if (this.prevHour >= 23 && currentHour === 0) {
       this.day++;
       EventBus.emit(Events.DAY_CHANGE, { day: this.day });
     }
+    this.prevHour = currentHour;
 
-    this.gameTime = newGameTime;
     EventBus.emit(Events.TIME_TICK, {
       gameTime: this.gameTime,
       day: this.day,
-      hour: this.getHour(),
+      hour: currentHour,
       minute: this.getMinute(),
       timeString: this.getTimeString(),
     });
@@ -139,6 +139,7 @@ export class WorldState {
     this.gameTime = data.gameTime;
     this.elapsedMs = data.elapsedMs;
     this.paused = data.paused;
+    this.prevHour = this.getHour();
     this.village = {
       ...data.village,
       resources: { ...data.village.resources },
