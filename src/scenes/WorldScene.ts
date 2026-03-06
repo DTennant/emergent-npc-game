@@ -78,6 +78,7 @@ export class WorldScene extends Phaser.Scene {
   private itemPickups: ItemPickupInstance[] = [];
   private spawnX = GAME_WIDTH / 2;
   private spawnY = GAME_HEIGHT / 2;
+  private innMarker: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super({ key: 'WorldScene' });
@@ -108,7 +109,7 @@ export class WorldScene extends Phaser.Scene {
       this.player.y - TILE_SIZE * 0.7,
       'You',
       {
-        fontSize: '11px',
+        fontSize: '24px',
         color: '#88bbff',
         stroke: '#000000',
         strokeThickness: 2,
@@ -166,7 +167,7 @@ export class WorldScene extends Phaser.Scene {
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     this.interactionPrompt = this.add.text(0, 0, '[E] Talk', {
-      fontSize: '12px',
+      fontSize: '26px',
       color: '#ffff00',
       stroke: '#000000',
       strokeThickness: 3,
@@ -237,6 +238,9 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.cameras.main.fadeIn(400);
+
+    this.createInnMarker();
+    this.showOpeningStory();
   }
 
   update(_time: number, delta: number): void {
@@ -374,7 +378,7 @@ export class WorldScene extends Phaser.Scene {
 
       this.add
         .text(b.x, b.y - b.h / 2 - 8, b.label, {
-          fontSize: '10px',
+          fontSize: '22px',
           color: '#ffffff',
           stroke: '#000000',
           strokeThickness: 2,
@@ -419,7 +423,7 @@ export class WorldScene extends Phaser.Scene {
 
     this.add
       .text(GAME_WIDTH / 2, 20, '\uD83C\uDFD8\uFE0F Thornwick Village', {
-        fontSize: '16px',
+        fontSize: '34px',
         color: '#ffffff',
         stroke: '#000000',
         strokeThickness: 3,
@@ -429,7 +433,7 @@ export class WorldScene extends Phaser.Scene {
       .setDepth(15);
 
     const exitHint = this.add.text(GAME_WIDTH - 10, GAME_HEIGHT / 2, '\u2192 Dark Woods', {
-      fontSize: '11px',
+      fontSize: '24px',
       color: '#aaffaa',
       stroke: '#000000',
       strokeThickness: 2,
@@ -606,13 +610,13 @@ export class WorldScene extends Phaser.Scene {
     const bg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 400, 150, 0x000000, 0.85);
     bg.setDepth(200);
     const text = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 25, message, {
-      fontSize: '18px',
+      fontSize: '38px',
       color: '#ffffff',
       align: 'center',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(201);
     const hint = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 20, '[Y] Yes    [N] No', {
-      fontSize: '14px',
+      fontSize: '30px',
       color: '#aaaaaa',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(201);
@@ -692,7 +696,7 @@ export class WorldScene extends Phaser.Scene {
       });
 
       const label = this.add.text(def.x, def.y - 16, def.label, {
-        fontSize: '9px',
+        fontSize: '20px',
         color: '#ffdd44',
         stroke: '#000000',
         strokeThickness: 2,
@@ -834,7 +838,7 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.shrineLabel = this.add.text(640, 61, 'Shrine of Dawn', {
-      fontSize: '10px',
+      fontSize: '22px',
       color: '#ffd700',
       stroke: '#000000',
       strokeThickness: 2,
@@ -1058,5 +1062,158 @@ export class WorldScene extends Phaser.Scene {
     });
 
     EventBus.emit(Events.SHOW_NOTIFICATION, 'You have fallen... Respawning at village.');
+  }
+
+  // --- Opening Story Overlay ---
+
+  private showOpeningStory(): void {
+    if (localStorage.getItem('story_intro_shown')) return;
+
+    const storyBeats = [
+      'You awaken near the village of Thornwick with no memory of how you arrived. A strange darkness lingers at the edge of the forest...',
+      'The village elder, Sage Aldric, has vanished. His scattered journal pages may hold the key to understanding the creeping Blight that threatens Thornwick.',
+      'The villagers may know more. Build their trust through conversation. Explore the village, gather supplies, and uncover the truth.',
+      'Your Quest: Find Aldric\'s journal pages, discover three ancient Runestones hidden in dungeons, and activate the Shrine of Dawn to seal the Blight.\n\n[Press any key to begin]',
+    ];
+
+    let currentScreen = 0;
+
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2,
+      GAME_WIDTH, GAME_HEIGHT,
+      0x000000, 0.85
+    );
+    overlay.setDepth(300);
+
+    const titleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.3, 'Emergent NPC World', {
+      fontSize: '42px',
+      color: '#ffd700',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 4,
+      resolution: window.devicePixelRatio,
+    });
+    titleText.setOrigin(0.5);
+    titleText.setDepth(301);
+
+    const bodyText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.5, storyBeats[0], {
+      fontSize: '56px',
+      color: '#ffffff',
+      align: 'center',
+      wordWrap: { width: GAME_WIDTH * 0.7 },
+      lineSpacing: 8,
+      stroke: '#000000',
+      strokeThickness: 2,
+      resolution: window.devicePixelRatio,
+    });
+    bodyText.setOrigin(0.5);
+    bodyText.setDepth(301);
+
+    const instructionText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.8, '[Press any key to continue]', {
+      fontSize: '22px',
+      color: '#888888',
+      align: 'center',
+      resolution: window.devicePixelRatio,
+    });
+    instructionText.setOrigin(0.5);
+    instructionText.setDepth(301);
+
+    const allElements = [overlay, titleText, bodyText, instructionText];
+    for (const el of allElements) {
+      el.setAlpha(0);
+    }
+    this.tweens.add({
+      targets: allElements,
+      alpha: { from: 0, to: 1 },
+      duration: 600,
+      ease: 'Power2',
+    });
+    this.tweens.add({
+      targets: overlay,
+      alpha: 0.85,
+      duration: 600,
+      ease: 'Power2',
+    });
+
+    const advance = () => {
+      currentScreen++;
+      if (currentScreen >= storyBeats.length) {
+        localStorage.setItem('story_intro_shown', 'true');
+        this.tweens.add({
+          targets: allElements,
+          alpha: 0,
+          duration: 400,
+          onComplete: () => {
+            for (const el of allElements) el.destroy();
+          },
+        });
+        this.input.keyboard!.off('keydown', advance);
+        this.input.off('pointerdown', advance);
+        return;
+      }
+
+      bodyText.setAlpha(0);
+      bodyText.setText(storyBeats[currentScreen]);
+
+      if (currentScreen === storyBeats.length - 1) {
+        titleText.setText('The Blight Awaits');
+        titleText.setAlpha(0);
+        instructionText.setVisible(false);
+        this.tweens.add({ targets: titleText, alpha: 1, duration: 400 });
+      }
+
+      this.tweens.add({
+        targets: bodyText,
+        alpha: 1,
+        duration: 400,
+        ease: 'Power2',
+      });
+    };
+
+    this.input.keyboard!.on('keydown', advance);
+    this.input.on('pointerdown', advance);
+  }
+
+  // --- Inn Marker ---
+
+  private createInnMarker(): void {
+    const innX = 704;
+    const innY = 248;
+
+    this.innMarker = this.add.text(innX, innY, '!', {
+      fontSize: '56px',
+      color: '#ffd700',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 4,
+      resolution: window.devicePixelRatio,
+    });
+    this.innMarker.setOrigin(0.5);
+    this.innMarker.setDepth(15);
+
+    this.tweens.add({
+      targets: this.innMarker,
+      alpha: { from: 0.4, to: 1.0 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    const onDialogueStart = (data: { npc: { persona: { id: string; name: string } } }) => {
+      if (data.npc.persona.id === 'innkeeper_rose' || data.npc.persona.name === 'Rose') {
+        this.destroyInnMarker();
+        EventBus.off(Events.DIALOGUE_START, onDialogueStart);
+      }
+    };
+    EventBus.on(Events.DIALOGUE_START, onDialogueStart);
+  }
+
+  private destroyInnMarker(): void {
+    if (this.innMarker) {
+      this.tweens.killTweensOf(this.innMarker);
+      this.innMarker.destroy();
+      this.innMarker = null;
+    }
   }
 }

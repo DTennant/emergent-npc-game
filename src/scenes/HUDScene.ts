@@ -36,11 +36,11 @@ export class HUDScene extends Phaser.Scene {
 
   create(): void {
     // HUD background strip
-    this.add.rectangle(GAME_WIDTH / 2, 16, GAME_WIDTH, 32, 0x000000, 0.6).setDepth(100);
+    this.add.rectangle(GAME_WIDTH / 2, 24, GAME_WIDTH, 48, 0x000000, 0.6).setDepth(100);
 
     // Time display
     this.timeText = this.add.text(10, 8, '06:00', {
-      fontSize: '16px',
+      fontSize: '34px',
       color: '#ffcc00',
       stroke: '#000000',
       strokeThickness: 3,
@@ -50,7 +50,7 @@ export class HUDScene extends Phaser.Scene {
 
     // Day display
     this.dayText = this.add.text(90, 8, 'Day 1', {
-      fontSize: '16px',
+      fontSize: '34px',
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 3,
@@ -60,7 +60,7 @@ export class HUDScene extends Phaser.Scene {
 
     // Quest Tracker
     this.questTrackerText = this.add.text(GAME_WIDTH - 120, 40, '', {
-      fontSize: '11px',
+      fontSize: '24px',
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 2,
@@ -75,7 +75,7 @@ export class HUDScene extends Phaser.Scene {
     // API status
     const hasApi = this.llmClient.hasApiKey();
     this.apiStatus = this.add.text(GAME_WIDTH - 50, 8, hasApi ? '🟢 LLM' : '🟡 Fallback', {
-      fontSize: '12px',
+      fontSize: '26px',
       color: hasApi ? '#44ff44' : '#ffaa00',
       stroke: '#000000',
       strokeThickness: 2,
@@ -86,7 +86,7 @@ export class HUDScene extends Phaser.Scene {
 
     this.add
       .text(GAME_WIDTH / 2, 8, 'WASD: Move | E: Talk | I: Inv | C: Craft | T: Trade | ESC: Close', {
-        fontSize: '12px',
+        fontSize: '26px',
         color: '#cccccc',
         stroke: '#000000',
         strokeThickness: 2,
@@ -96,7 +96,7 @@ export class HUDScene extends Phaser.Scene {
       .setDepth(101);
 
     this.equippedWeaponText = this.add.text(10, GAME_HEIGHT - 30, 'Weapon: (none)', {
-      fontSize: '14px',
+      fontSize: '30px',
       color: '#aaaaaa',
       stroke: '#000000',
       strokeThickness: 2,
@@ -105,12 +105,12 @@ export class HUDScene extends Phaser.Scene {
 
     // Notification area
     this.notificationText = this.add.text(GAME_WIDTH / 2, 40, '', {
-      fontSize: '13px',
+      fontSize: '28px',
       color: '#44ff88',
       stroke: '#000000',
       strokeThickness: 2,
       backgroundColor: '#00000088',
-      padding: { x: 8, y: 4 },
+      padding: { x: 16, y: 8 },
       resolution: window.devicePixelRatio,
     });
     this.notificationText.setOrigin(0.5);
@@ -118,7 +118,7 @@ export class HUDScene extends Phaser.Scene {
     this.notificationText.setVisible(false);
 
     const settingsBtn = this.add.text(GAME_WIDTH - 30, 6, '⚙️', {
-      fontSize: '20px',
+      fontSize: '42px',
       resolution: window.devicePixelRatio,
     });
     settingsBtn.setDepth(101);
@@ -144,9 +144,14 @@ export class HUDScene extends Phaser.Scene {
     this.input.keyboard!.addKey('H').on('down', () => this.toggleHelp());
     this.createHelpPanel();
 
-    // Initial Hints
-    this.time.delayedCall(1000, () => {
-        this.showHint('welcome', 'Welcome to Thornwick! Use WASD to move. Press E near an NPC to talk.');
+    this.time.delayedCall(2000, () => {
+      this.showHint('explore_village', 'Explore the village! Look for glowing items to pick up with E.');
+    });
+    this.time.delayedCall(8000, () => {
+      this.showHint('talk_to_npcs', 'Talk to the villagers with E. Try Rose at the Inn — she knows about Sage Aldric.');
+    });
+    this.time.delayedCall(15000, () => {
+      this.showHint('check_quest', 'Press H for help. Head east (\u2192) to find the Dark Woods when ready.');
     });
   }
 
@@ -251,12 +256,12 @@ export class HUDScene extends Phaser.Scene {
     this.shownHints.add(id);
     localStorage.setItem('hints_shown', JSON.stringify(Array.from(this.shownHints)));
 
-    const hintBg = this.add.rectangle(GAME_WIDTH / 2, 70, 500, 40, 0x1a3366, 0.9);
+    const hintBg = this.add.rectangle(GAME_WIDTH / 2, 70, 500, 64, 0x1a3366, 0.9);
     hintBg.setStrokeStyle(1, 0x4488ff);
     hintBg.setDepth(150);
 
     const hintText = this.add.text(GAME_WIDTH / 2, 70, '💡 ' + message, {
-      fontSize: '13px',
+      fontSize: '28px',
       color: '#ffffff',
       align: 'center',
       resolution: window.devicePixelRatio,
@@ -321,7 +326,7 @@ export class HUDScene extends Phaser.Scene {
         
         this.questTrackerText.setColor('#ffffff');
     } else {
-        text += 'Talk to Rose at the Inn\nabout Aldric\'s journal';
+        text += 'Explore Thornwick Village\n\u2022 Pick up items (E key)\n\u2022 Talk to villagers\n\u2022 Find Aldric\'s journal pages';
         this.questTrackerText.setColor('#cccccc');
     }
 
@@ -352,7 +357,7 @@ export class HUDScene extends Phaser.Scene {
 
     // Title
     const title = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.1, '📜 Help — Controls & Guide', {
-      fontSize: '24px',
+      fontSize: '48px',
       color: '#ffd700',
       fontStyle: 'bold',
       stroke: '#000000',
@@ -363,21 +368,21 @@ export class HUDScene extends Phaser.Scene {
 
     // Content Style
     const headerStyle = {
-      fontSize: '16px',
+      fontSize: '34px',
       color: '#ffd700',
       fontStyle: 'bold',
       resolution: window.devicePixelRatio,
     };
     
     const bodyStyle = {
-      fontSize: '13px',
+      fontSize: '28px',
       color: '#ffffff',
       lineSpacing: 6,
       resolution: window.devicePixelRatio,
     };
 
     const tipStyle = {
-      fontSize: '13px',
+      fontSize: '28px',
       color: '#cccccc',
       lineSpacing: 4,
       fontStyle: 'italic',
@@ -428,7 +433,7 @@ export class HUDScene extends Phaser.Scene {
 
     // Footer
     const footer = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.85, 'Press H to close', {
-      fontSize: '14px',
+      fontSize: '30px',
       color: '#888888',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5);
