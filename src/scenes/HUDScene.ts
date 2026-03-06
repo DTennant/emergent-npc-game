@@ -3,7 +3,7 @@ import { WorldState } from '../world/WorldState';
 import { LLMClient } from '../ai/LLMClient';
 import { ITEMS } from '../inventory/types';
 import { EventBus, Events } from '../world/EventBus';
-import { GAME_WIDTH, GAME_HEIGHT } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT, fs } from '../config';
 
 interface HUDData {
   worldState: WorldState;
@@ -40,7 +40,7 @@ export class HUDScene extends Phaser.Scene {
 
     // Time display
     this.timeText = this.add.text(10, 8, '06:00', {
-      fontSize: '34px',
+      fontSize: fs(34),
       color: '#ffcc00',
       stroke: '#000000',
       strokeThickness: 3,
@@ -50,7 +50,7 @@ export class HUDScene extends Phaser.Scene {
 
     // Day display
     this.dayText = this.add.text(90, 8, 'Day 1', {
-      fontSize: '34px',
+      fontSize: fs(34),
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 3,
@@ -60,7 +60,7 @@ export class HUDScene extends Phaser.Scene {
 
     // Quest Tracker
     this.questTrackerText = this.add.text(GAME_WIDTH - 120, 40, '', {
-      fontSize: '24px',
+      fontSize: fs(24),
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 2,
@@ -75,7 +75,7 @@ export class HUDScene extends Phaser.Scene {
     // API status
     const hasApi = this.llmClient.hasApiKey();
     this.apiStatus = this.add.text(GAME_WIDTH - 50, 8, hasApi ? '🟢 LLM' : '🟡 Fallback', {
-      fontSize: '26px',
+      fontSize: fs(26),
       color: hasApi ? '#44ff44' : '#ffaa00',
       stroke: '#000000',
       strokeThickness: 2,
@@ -86,7 +86,7 @@ export class HUDScene extends Phaser.Scene {
 
     this.add
       .text(GAME_WIDTH / 2, 8, 'WASD: Move | E: Talk | I: Inv | C: Craft | T: Trade | ESC: Close', {
-        fontSize: '26px',
+        fontSize: fs(26),
         color: '#cccccc',
         stroke: '#000000',
         strokeThickness: 2,
@@ -96,7 +96,7 @@ export class HUDScene extends Phaser.Scene {
       .setDepth(101);
 
     this.equippedWeaponText = this.add.text(10, GAME_HEIGHT - 30, 'Weapon: (none)', {
-      fontSize: '30px',
+      fontSize: fs(30),
       color: '#aaaaaa',
       stroke: '#000000',
       strokeThickness: 2,
@@ -105,7 +105,7 @@ export class HUDScene extends Phaser.Scene {
 
     // Notification area
     this.notificationText = this.add.text(GAME_WIDTH / 2, 40, '', {
-      fontSize: '28px',
+      fontSize: fs(28),
       color: '#44ff88',
       stroke: '#000000',
       strokeThickness: 2,
@@ -118,7 +118,7 @@ export class HUDScene extends Phaser.Scene {
     this.notificationText.setVisible(false);
 
     const settingsBtn = this.add.text(GAME_WIDTH - 30, 6, '⚙️', {
-      fontSize: '42px',
+      fontSize: fs(42),
       resolution: window.devicePixelRatio,
     });
     settingsBtn.setDepth(101);
@@ -261,7 +261,7 @@ export class HUDScene extends Phaser.Scene {
     hintBg.setDepth(150);
 
     const hintText = this.add.text(GAME_WIDTH / 2, 70, '💡 ' + message, {
-      fontSize: '28px',
+      fontSize: fs(28),
       color: '#ffffff',
       align: 'center',
       resolution: window.devicePixelRatio,
@@ -357,7 +357,7 @@ export class HUDScene extends Phaser.Scene {
 
     // Title
     const title = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.1, '📜 Help — Controls & Guide', {
-      fontSize: '48px',
+      fontSize: fs(48),
       color: '#ffd700',
       fontStyle: 'bold',
       stroke: '#000000',
@@ -368,24 +368,24 @@ export class HUDScene extends Phaser.Scene {
 
     // Content Style
     const headerStyle = {
-      fontSize: '34px',
+      fontSize: fs(34),
       color: '#ffd700',
-      fontStyle: 'bold',
+      fontStyle: 'bold' as const,
       resolution: window.devicePixelRatio,
     };
     
     const bodyStyle = {
-      fontSize: '28px',
+      fontSize: fs(28),
       color: '#ffffff',
       lineSpacing: 6,
       resolution: window.devicePixelRatio,
     };
 
     const tipStyle = {
-      fontSize: '28px',
+      fontSize: fs(28),
       color: '#cccccc',
       lineSpacing: 4,
-      fontStyle: 'italic',
+      fontStyle: 'italic' as const,
       resolution: window.devicePixelRatio,
     };
 
@@ -433,7 +433,7 @@ export class HUDScene extends Phaser.Scene {
 
     // Footer
     const footer = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.85, 'Press H to close', {
-      fontSize: '30px',
+      fontSize: fs(30),
       color: '#888888',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5);

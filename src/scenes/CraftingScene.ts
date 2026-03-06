@@ -4,7 +4,7 @@ import { ITEMS } from '../inventory/types';
 import { CraftingSystem } from '../crafting/CraftingSystem';
 import { CraftingRecipe } from '../crafting/CraftingRecipes';
 import { EventBus, Events } from '../world/EventBus';
-import { GAME_WIDTH, GAME_HEIGHT } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT, fs } from '../config';
 
 interface CraftingSceneData {
   inventory: Inventory;
@@ -61,7 +61,7 @@ export class CraftingScene extends Phaser.Scene {
 
     const benchLabel = this.atBench ? 'Crafting Bench' : 'Crafting (Field)';
     this.add.text(cx, cy - PANEL_HEIGHT / 2 + 20, benchLabel, {
-      fontSize: '42px',
+      fontSize: fs(42),
       color: '#ffd700',
       stroke: '#000000',
       strokeThickness: 3,
@@ -72,7 +72,7 @@ export class CraftingScene extends Phaser.Scene {
     this.detailContainer = this.add.container(0, 0).setDepth(53);
 
     this.craftButton = this.add.text(cx + 80, cy + PANEL_HEIGHT / 2 - 50, '  Craft  ', {
-      fontSize: '34px',
+      fontSize: fs(34),
       color: '#000000',
       backgroundColor: '#44cc44',
       padding: { x: 16, y: 8 },
@@ -84,13 +84,13 @@ export class CraftingScene extends Phaser.Scene {
     this.craftButton.on('pointerout', () => this.craftButton.setAlpha(1));
 
     this.resultText = this.add.text(cx - 80, cy + PANEL_HEIGHT / 2 - 50, '', {
-      fontSize: '28px',
+      fontSize: fs(28),
       color: '#44ff88',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(54);
 
     this.add.text(cx, cy + PANEL_HEIGHT / 2 - 16, 'ESC / C to close  |  ↑↓ select  |  ENTER craft', {
-      fontSize: '24px',
+      fontSize: fs(24),
       color: '#888888',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(52);
@@ -151,7 +151,7 @@ export class CraftingScene extends Phaser.Scene {
 
     if (this.recipes.length === 0) {
       const empty = this.add.text(listX + listWidth / 2, listY + 60, 'No recipes available.\nFind a crafting bench or build NPC trust.', {
-        fontSize: '28px',
+        fontSize: fs(28),
         color: '#888888',
         align: 'center',
         resolution: window.devicePixelRatio,
@@ -177,7 +177,7 @@ export class CraftingScene extends Phaser.Scene {
 
       const nameColor = selected ? '#ffd700' : (canCraft ? '#ffffff' : '#666666');
       const name = this.add.text(listX + 8, rowY + 4, recipe.name, {
-        fontSize: '30px',
+        fontSize: fs(30),
         color: nameColor,
         fontStyle: selected ? 'bold' : 'normal',
         resolution: window.devicePixelRatio,
@@ -187,7 +187,7 @@ export class CraftingScene extends Phaser.Scene {
       const resultDef = ITEMS[recipe.result.itemId];
       const qtyStr = recipe.result.quantity > 1 ? ` x${recipe.result.quantity}` : '';
       const resultLabel = this.add.text(listX + listWidth - 8, rowY + 4, `→ ${resultDef?.name ?? recipe.result.itemId}${qtyStr}`, {
-        fontSize: '26px',
+        fontSize: fs(26),
         color: canCraft ? '#44ff88' : '#555555',
         resolution: window.devicePixelRatio,
       }).setOrigin(1, 0);
@@ -203,7 +203,7 @@ export class CraftingScene extends Phaser.Scene {
         .join('  ');
 
       const ingText = this.add.text(listX + 8, rowY + 22, ingStr, {
-        fontSize: '22px',
+        fontSize: fs(22),
         color: '#999999',
         resolution: window.devicePixelRatio,
       });
@@ -215,7 +215,7 @@ export class CraftingScene extends Phaser.Scene {
         listX + listWidth - 8,
         listY + VISIBLE_ROWS * ROW_HEIGHT + 2,
         `${this.selectedIndex + 1}/${this.recipes.length}`,
-        { fontSize: '22px', color: '#666666', resolution: window.devicePixelRatio }
+        { fontSize: fs(22), color: '#666666', resolution: window.devicePixelRatio }
       ).setOrigin(1, 0);
       this.recipeContainer.add(scrollInfo);
     }
@@ -236,7 +236,7 @@ export class CraftingScene extends Phaser.Scene {
     const detailX = GAME_WIDTH / 2 - PANEL_WIDTH / 2 + 20;
 
     const desc = this.add.text(detailX + 8, detailY, recipe.description, {
-      fontSize: '26px',
+      fontSize: fs(26),
       color: '#cccccc',
       wordWrap: { width: PANEL_WIDTH - 60 },
       resolution: window.devicePixelRatio,

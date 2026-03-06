@@ -4,7 +4,7 @@ import { ITEMS } from '../inventory/types';
 import { TradeSystem, TradeItem } from '../crafting/TradeSystem';
 import { NPCShop } from '../crafting/TradeData';
 import { EventBus, Events } from '../world/EventBus';
-import { GAME_WIDTH, GAME_HEIGHT } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT, fs } from '../config';
 
 interface TradeSceneData {
   inventory: Inventory;
@@ -65,7 +65,7 @@ export class TradeScene extends Phaser.Scene {
       .setStrokeStyle(2, 0x4488ff).setDepth(51);
 
     this.add.text(cx, cy - PANEL_HEIGHT / 2 + 20, this.shop.shopName, {
-      fontSize: '42px',
+      fontSize: fs(42),
       color: '#4488ff',
       stroke: '#000000',
       strokeThickness: 3,
@@ -75,7 +75,7 @@ export class TradeScene extends Phaser.Scene {
     const tabY = cy - PANEL_HEIGHT / 2 + 52;
 
     this.modeButtons.buy = this.add.text(cx - 60, tabY, '  Buy  ', {
-      fontSize: '30px',
+      fontSize: fs(30),
       color: '#000000',
       backgroundColor: '#4488ff',
       padding: { x: 12, y: 4 },
@@ -83,7 +83,7 @@ export class TradeScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(53).setInteractive();
 
     this.modeButtons.sell = this.add.text(cx + 60, tabY, '  Sell  ', {
-      fontSize: '30px',
+      fontSize: fs(30),
       color: '#cccccc',
       backgroundColor: '#333344',
       padding: { x: 12, y: 4 },
@@ -94,7 +94,7 @@ export class TradeScene extends Phaser.Scene {
     this.modeButtons.sell.on('pointerdown', () => this.switchMode('sell'));
 
     this.goldText = this.add.text(cx + PANEL_WIDTH / 2 - 20, tabY, '', {
-      fontSize: '30px',
+      fontSize: fs(30),
       color: '#ffd700',
       resolution: window.devicePixelRatio,
     }).setOrigin(1, 0.5).setDepth(52);
@@ -102,14 +102,14 @@ export class TradeScene extends Phaser.Scene {
     this.listContainer = this.add.container(0, 0).setDepth(53);
 
     this.statusText = this.add.text(cx, cy + PANEL_HEIGHT / 2 - 68, '', {
-      fontSize: '28px',
+      fontSize: fs(28),
       color: '#44ff88',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(54);
 
     const qtyY = cy + PANEL_HEIGHT / 2 - 42;
     const minusBtn = this.add.text(cx - 80, qtyY, ' − ', {
-      fontSize: '34px',
+      fontSize: fs(34),
       color: '#ffffff',
       backgroundColor: '#333355',
       padding: { x: 8, y: 2 },
@@ -117,13 +117,13 @@ export class TradeScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(53).setInteractive();
 
     this.quantityText = this.add.text(cx, qtyY, 'Qty: 1', {
-      fontSize: '30px',
+      fontSize: fs(30),
       color: '#ffffff',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(53);
 
     const plusBtn = this.add.text(cx + 80, qtyY, ' + ', {
-      fontSize: '34px',
+      fontSize: fs(34),
       color: '#ffffff',
       backgroundColor: '#333355',
       padding: { x: 8, y: 2 },
@@ -134,7 +134,7 @@ export class TradeScene extends Phaser.Scene {
     plusBtn.on('pointerdown', () => this.adjustQuantity(1));
 
     this.add.text(cx, cy + PANEL_HEIGHT / 2 - 16, 'ESC close | TAB switch | ↑↓ select | ←→ qty | ENTER trade', {
-      fontSize: '24px',
+      fontSize: fs(24),
       color: '#888888',
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(52);
@@ -262,7 +262,7 @@ export class TradeScene extends Phaser.Scene {
         ? 'Nothing for sale right now.'
         : 'You have nothing to sell here.';
       const empty = this.add.text(listX + listWidth / 2, listY + 80, emptyMsg, {
-        fontSize: '28px',
+        fontSize: fs(28),
         color: '#888888',
         resolution: window.devicePixelRatio,
       }).setOrigin(0.5);
@@ -272,13 +272,13 @@ export class TradeScene extends Phaser.Scene {
 
     const headerY = listY - 4;
     const hName = this.add.text(listX + 8, headerY, 'Item', {
-      fontSize: '24px', color: '#888888', resolution: window.devicePixelRatio,
+      fontSize: fs(24), color: '#888888', resolution: window.devicePixelRatio,
     });
     const hPrice = this.add.text(listX + listWidth - 80, headerY, 'Price', {
-      fontSize: '24px', color: '#888888', resolution: window.devicePixelRatio,
+      fontSize: fs(24), color: '#888888', resolution: window.devicePixelRatio,
     });
     const hStock = this.add.text(listX + listWidth - 8, headerY, this.mode === 'buy' ? 'Stock' : 'Qty', {
-      fontSize: '24px', color: '#888888', resolution: window.devicePixelRatio,
+      fontSize: fs(24), color: '#888888', resolution: window.devicePixelRatio,
     }).setOrigin(1, 0);
     this.listContainer.add([hName, hPrice, hStock]);
 
@@ -303,7 +303,7 @@ export class TradeScene extends Phaser.Scene {
       if (dimmed) nameColor = '#555555';
 
       const name = this.add.text(listX + 8, rowY + 2, item.def.name, {
-        fontSize: '28px',
+        fontSize: fs(28),
         color: nameColor,
         fontStyle: selected ? 'bold' : 'normal',
         resolution: window.devicePixelRatio,
@@ -312,7 +312,7 @@ export class TradeScene extends Phaser.Scene {
 
       if (item.locked && item.lockReason) {
         const lockLabel = this.add.text(listX + 8, rowY + 18, `🔒 ${item.lockReason}`, {
-          fontSize: '20px', color: '#ff6666', resolution: window.devicePixelRatio,
+          fontSize: fs(20), color: '#ff6666', resolution: window.devicePixelRatio,
         });
         this.listContainer.add(lockLabel);
       } else {
@@ -322,19 +322,19 @@ export class TradeScene extends Phaser.Scene {
           ? `def: ${item.def.stats.defense}`
           : item.def.type;
         const typeText = this.add.text(listX + 8, rowY + 18, typeLabel, {
-          fontSize: '20px', color: '#777777', resolution: window.devicePixelRatio,
+          fontSize: fs(20), color: '#777777', resolution: window.devicePixelRatio,
         });
         this.listContainer.add(typeText);
       }
 
       const priceColor = dimmed ? '#555555' : '#ffd700';
       const priceText = this.add.text(listX + listWidth - 80, rowY + 6, `${item.price}g`, {
-        fontSize: '28px', color: priceColor, resolution: window.devicePixelRatio,
+        fontSize: fs(28), color: priceColor, resolution: window.devicePixelRatio,
       });
       this.listContainer.add(priceText);
 
       const stockText = this.add.text(listX + listWidth - 8, rowY + 6, `${item.stock}`, {
-        fontSize: '28px', color: dimmed ? '#555555' : '#aaaaaa', resolution: window.devicePixelRatio,
+        fontSize: fs(28), color: dimmed ? '#555555' : '#aaaaaa', resolution: window.devicePixelRatio,
       }).setOrigin(1, 0);
       this.listContainer.add(stockText);
     }
@@ -344,7 +344,7 @@ export class TradeScene extends Phaser.Scene {
         listX + listWidth - 8,
         listY + 16 + VISIBLE_ROWS * ROW_HEIGHT + 4,
         `${this.selectedIndex + 1}/${this.items.length}`,
-        { fontSize: '22px', color: '#666666', resolution: window.devicePixelRatio }
+        { fontSize: fs(22), color: '#666666', resolution: window.devicePixelRatio }
       ).setOrigin(1, 0);
       this.listContainer.add(scrollInfo);
     }

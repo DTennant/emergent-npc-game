@@ -44,3 +44,24 @@ export const NPC_COLORS: Record<string, number> = {
   guard_marcus: 0x667788,
   herbalist_willow: 0x33aa66,
 };
+
+export const FONT_SCALE_OPTIONS = {
+  small: 0.6,
+  medium: 1.0,
+  large: 1.4,
+} as const;
+
+export type FontScaleKey = keyof typeof FONT_SCALE_OPTIONS;
+
+export function getFontScale(): number {
+  const key = (localStorage.getItem('font_scale') || 'medium') as FontScaleKey;
+  return FONT_SCALE_OPTIONS[key] ?? 1.0;
+}
+
+export function fs(baseSize: number): string {
+  return `${Math.round(baseSize * getFontScale())}px`;
+}
+
+export function fsn(baseSize: number): number {
+  return Math.round(baseSize * getFontScale());
+}
