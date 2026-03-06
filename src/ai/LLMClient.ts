@@ -135,7 +135,7 @@ export class LLMClient {
     fullMemoryNarrative?: string
   ): Promise<LLMResponse> {
     if (!this.hasApiKey()) {
-      return this.getFallbackResponse(memoryContext);
+      return this.getFallbackResponse(memoryContext, npcPersona.name, npcPersona.role);
     }
 
     const systemPrompt = this.buildSystemPrompt(
@@ -218,7 +218,7 @@ Respond with a JSON object containing:
     return prompt;
   }
 
-  private getFallbackResponse(context: MemoryContext): LLMResponse {
+  private getFallbackResponse(context: MemoryContext, npcName?: string, npcRole?: string): LLMResponse {
     let category = 'greeting';
 
     if (context.relationship) {
@@ -233,7 +233,21 @@ Respond with a JSON object containing:
     }
 
     const dialogues = FALLBACK_DIALOGUES[category];
-    const dialogue = dialogues[Math.floor(Math.random() * dialogues.length)];
+    let dialogue = dialogues[Math.floor(Math.random() * dialogues.length)];
+
+    if (npcName && npcRole) {
+      const rolePrefix: Record<string, string> = {
+        'Blacksmith': '*wipes soot from hands* ',
+        'Innkeeper': '*polishes a glass* ',
+        'Herbalist': '*examines a flower* ',
+        'Guard Captain': '*adjusts sword belt* ',
+        'Farmer': '*leans on pitchfork* ',
+        'Merchant': '*checks ledger* ',
+      };
+      const prefix = rolePrefix[npcRole] ?? '';
+      dialogue = prefix + dialogue;
+    }
+
     return makeFallbackResponse(dialogue);
   }
 
@@ -271,6 +285,8 @@ Respond with a JSON object containing:
   private async callAPI(
     messages: { role: string; content: string }[]
   ): Promise<LLMResponse> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
       const url = `${this.baseUrl}/chat/completions`;
       console.log(`[LLM] POST ${url} model=${this.model}`);
@@ -287,7 +303,9 @@ Respond with a JSON object containing:
           temperature: 0.8,
           response_format: { type: 'json_object' },
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errBody = await response.text();
@@ -299,6 +317,7 @@ Respond with a JSON object containing:
 
       return this.parseLLMResponse(content);
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error('LLM API error:', error);
       console.warn('LLM call failed, using fallback response');
       const dialogues = FALLBACK_DIALOGUES.default;

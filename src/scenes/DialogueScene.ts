@@ -91,10 +91,6 @@ export class DialogueScene extends Phaser.Scene {
 
     this.createInput(boxY, boxHeight);
     this.showNPCGreeting();
-
-    this.input.keyboard!.on('keydown-ESC', () => {
-      this.closeDialogue();
-    });
   }
 
   private createConversationDisplay(boxY: number, boxHeight: number): void {

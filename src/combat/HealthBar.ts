@@ -19,13 +19,13 @@ export class HealthBar {
     this.barWidth = width;
     this.barHeight = height;
 
-    this.background = scene.add.rectangle(x, y, width, height, 0x333333);
+    this.background = scene.add.rectangle(x - width / 2, y, width, height, 0x333333);
     this.background.setDepth(50);
-    this.background.setOrigin(0.5, 0.5);
+    this.background.setOrigin(0, 0.5);
 
-    this.fill = scene.add.rectangle(x, y, width, height, 0x00cc00);
+    this.fill = scene.add.rectangle(x - width / 2, y, width, height, 0x00cc00);
     this.fill.setDepth(50);
-    this.fill.setOrigin(0.5, 0.5);
+    this.fill.setOrigin(0, 0.5);
   }
 
   setHealth(current: number): void {
@@ -42,8 +42,8 @@ export class HealthBar {
   }
 
   setPosition(x: number, y: number): void {
-    this.background.setPosition(x, y);
-    this.fill.setPosition(x, y);
+    this.background.setPosition(x - this.barWidth / 2, y);
+    this.fill.setPosition(x - this.barWidth / 2, y);
   }
 
   setVisible(visible: boolean): void {

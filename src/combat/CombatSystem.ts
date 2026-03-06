@@ -13,6 +13,7 @@ import {
 const CONSUMABLE_HEAL: Record<string, number> = {
   health_potion: 40,
   provisions: 20,
+  blight_ward: 25,
 };
 
 export class CombatSystem {
@@ -75,9 +76,9 @@ export class CombatSystem {
 
   getAttackDamage(inventory: Inventory): number {
     const weaponId = inventory.getEquipped('weapon');
-    if (!weaponId) return 0;
+    if (!weaponId) return 1;
     const def = ITEMS[weaponId];
-    return def?.stats?.damage ?? 0;
+    return def?.stats?.damage ?? 1;
   }
 
   getDefense(inventory: Inventory): number {

@@ -23,6 +23,7 @@ export class HUDScene extends Phaser.Scene {
   private helpPanel!: Phaser.GameObjects.Container;
   private shownHints: Set<string> = new Set();
   private questTrackerText!: Phaser.GameObjects.Text;
+  private helpKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
     super({ key: 'HUDScene' });
@@ -141,7 +142,8 @@ export class HUDScene extends Phaser.Scene {
     EventBus.on(Events.QUEST_PROGRESS, this.onQuestProgress, this);
     EventBus.on(Events.ENTITY_DAMAGED, this.onEntityDamaged, this);
 
-    this.input.keyboard!.addKey('H').on('down', () => this.toggleHelp());
+    this.helpKey = this.input.keyboard!.addKey('H');
+    this.helpKey.on('down', () => this.toggleHelp());
     this.createHelpPanel();
 
     this.time.delayedCall(2000, () => {
@@ -184,6 +186,9 @@ export class HUDScene extends Phaser.Scene {
     EventBus.off(Events.TRADE_COMPLETE, this.onTradeComplete, this);
     EventBus.off(Events.QUEST_PROGRESS, this.onQuestProgress, this);
     EventBus.off(Events.ENTITY_DAMAGED, this.onEntityDamaged, this);
+    if (this.helpKey) {
+      this.helpKey.removeAllListeners();
+    }
   }
 
   private onShowNotification(data: string | { message?: string; text?: string }): void {

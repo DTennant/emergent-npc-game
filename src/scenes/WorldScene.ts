@@ -1151,7 +1151,7 @@ export class WorldScene extends Phaser.Scene {
             for (const el of allElements) el.destroy();
           },
         });
-        this.input.keyboard!.off('keydown', advance);
+        this.input.keyboard!.off('keydown', advanceOnKey);
         this.input.off('pointerdown', advance);
         return;
       }
@@ -1174,7 +1174,12 @@ export class WorldScene extends Phaser.Scene {
       });
     };
 
-    this.input.keyboard!.on('keydown', advance);
+    const advanceOnKey = (e: KeyboardEvent) => {
+      if (['Space', 'Enter', 'Escape'].includes(e.code)) {
+        advance();
+      }
+    };
+    this.input.keyboard!.on('keydown', advanceOnKey);
     this.input.on('pointerdown', advance);
   }
 

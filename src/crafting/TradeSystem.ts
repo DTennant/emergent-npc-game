@@ -82,6 +82,11 @@ export class TradeSystem {
       return false;
     }
 
+    const shopItem = shop.sells.find((si) => si.itemId === itemId);
+    if (shopItem) {
+      shopItem.stock -= quantity;
+    }
+
     EventBus.emit(Events.TRADE_COMPLETE, {
       type: 'buy',
       npcId: shop.npcId,
@@ -105,7 +110,8 @@ export class TradeSystem {
     if (quantity > item.stock) return false;
 
     const totalValue = item.price * quantity;
-    inventory.removeItem(itemId, quantity);
+    const removed = inventory.removeItem(itemId, quantity);
+    if (!removed) return false;
     inventory.addItem('gold', totalValue);
 
     EventBus.emit(Events.TRADE_COMPLETE, {

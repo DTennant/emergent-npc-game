@@ -231,12 +231,14 @@ export class NPC {
     });
 
     this.memory.updateRelationship('player', {
+      trustDelta: 0.03,
+      affectionDelta: 0.02,
       note: `Talked on day ${day}`,
       day,
     });
 
-    this.memory.trackPlayerTrust();
     const fullMemoryNarrative = this.memory.getFullMemoryNarrative(day, this.goals);
+    this.memory.trackPlayerTrust();
 
     const response = await llmClient.generateDialogue(
       {
@@ -280,6 +282,11 @@ export class NPC {
         'interaction',
         day
       );
+    }
+
+    const activeGoals = this.goals.getActiveGoals();
+    for (const goal of activeGoals) {
+      this.goals.updateGoalProgress(goal.id, goal.progress + 0.05);
     }
 
     this.memory.savePersistentMemory(this.persona.id);

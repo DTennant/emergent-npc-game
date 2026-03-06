@@ -68,13 +68,20 @@ export class QuestGateChecker {
     npcId: string,
     questId: string,
     trust: number,
-    familiarity: number
+    familiarity: number,
+    inventory?: { hasItem(itemId: string, minQuantity?: number): boolean }
   ): boolean {
     const gate = QUEST_GATES.find(
       (g) => g.npcId === npcId && g.questId === questId
     );
     if (!gate) return false;
-    return trust >= gate.trustMin && familiarity >= gate.familiarityMin;
+    if (trust < gate.trustMin || familiarity < gate.familiarityMin) return false;
+    if (gate.requiresItems && inventory) {
+      for (const req of gate.requiresItems) {
+        if (!inventory.hasItem(req.itemId, req.quantity)) return false;
+      }
+    }
+    return true;
   }
 
   static getGatesForNPC(npcId: string): QuestGate[] {

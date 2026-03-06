@@ -148,5 +148,11 @@ export class WorldState {
     if (data.villageMemory) {
       this.villageMemory.fromJSON(data.villageMemory);
     }
+    if (data.blightSystem) {
+      this.blightSystemData = data.blightSystem;
+    }
+    if (data.storyline) {
+      this.storylineData = data.storyline;
+    }
   }
 }

@@ -50,6 +50,9 @@ export class DungeonScene extends Phaser.Scene {
   private dungeonCleared = false;
   private loadingRoom = false;
   private cleanedUp = false;
+  private notificationText!: Phaser.GameObjects.Text;
+  private notificationTimer = 0;
+  private notificationHandler!: (data: string | { message?: string; text?: string }) => void;
   private deathHandler!: () => void;
   private entityDiedHandler!: (data: { entity: string; drops: { itemId: string; quantity: number }[] }) => void;
 
@@ -128,6 +131,28 @@ export class DungeonScene extends Phaser.Scene {
     this.escLabel.setDepth(100);
     this.escLabel.setScrollFactor(0);
 
+    this.notificationText = this.add.text(GAME_WIDTH / 2, 60, '', {
+      fontSize: fs(28),
+      color: '#44ff88',
+      stroke: '#000000',
+      strokeThickness: 2,
+      backgroundColor: '#00000088',
+      padding: { x: 16, y: 8 },
+      resolution: window.devicePixelRatio,
+    });
+    this.notificationText.setOrigin(0.5);
+    this.notificationText.setDepth(100);
+    this.notificationText.setScrollFactor(0);
+    this.notificationText.setVisible(false);
+
+    this.notificationHandler = (data: string | { message?: string; text?: string }) => {
+      const msg = typeof data === 'string' ? data : (data.message ?? data.text ?? '');
+      this.notificationText.setText(msg);
+      this.notificationText.setVisible(true);
+      this.notificationTimer = 3000;
+    };
+    EventBus.on(Events.SHOW_NOTIFICATION, this.notificationHandler);
+
     this.spaceKey.on('down', () => {
       this.handlePlayerAttack();
     });
@@ -170,6 +195,13 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     this.checkEnemyAttacks();
+
+    if (this.notificationTimer > 0) {
+      this.notificationTimer -= delta;
+      if (this.notificationTimer <= 0) {
+        this.notificationText.setVisible(false);
+      }
+    }
 
     this.playerHealthBar.setPosition(this.player.x, this.player.y - TILE_SIZE);
     this.playerHealthBar.setHealth(this.combatSystem.getHealth());
@@ -276,6 +308,13 @@ export class DungeonScene extends Phaser.Scene {
         this.doorZone,
         () => {
           if (this.loadingRoom) return;
+          const aliveEnemies = this.enemies.filter((e) => !e.isDead());
+          if (aliveEnemies.length > 0) {
+            EventBus.emit(Events.SHOW_NOTIFICATION, {
+              message: `Defeat all enemies first! (${aliveEnemies.length} remaining)`,
+            });
+            return;
+          }
           this.loadingRoom = true;
           this.loadRoom(nextRoom);
         },
@@ -434,6 +473,7 @@ export class DungeonScene extends Phaser.Scene {
     this.cleanedUp = true;
     EventBus.off(Events.PLAYER_DIED, this.deathHandler);
     EventBus.off(Events.ENTITY_DIED, this.entityDiedHandler);
+    EventBus.off(Events.SHOW_NOTIFICATION, this.notificationHandler);
     this.clearRoom();
     this.playerHealthBar.destroy();
   }
