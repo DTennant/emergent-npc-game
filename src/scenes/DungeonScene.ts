@@ -106,7 +106,7 @@ export class DungeonScene extends Phaser.Scene {
     this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
     this.roomLabel = this.add.text(10, 10, '', {
-      fontSize: '14px',
+      fontSize: '30px',
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 2,
@@ -116,7 +116,7 @@ export class DungeonScene extends Phaser.Scene {
     this.roomLabel.setScrollFactor(0);
 
     this.escLabel = this.add.text(GAME_WIDTH - 10, 10, '[ESC] Exit Dungeon', {
-      fontSize: '12px',
+      fontSize: '26px',
       color: '#aaaaaa',
       stroke: '#000000',
       strokeThickness: 2,
@@ -282,7 +282,7 @@ export class DungeonScene extends Phaser.Scene {
       );
 
       const doorLabel = this.add.text(doorPos.x, doorPos.y - TILE_SIZE * 2.5, 'Next Room →', {
-        fontSize: '11px',
+        fontSize: '24px',
         color: '#00ff00',
         stroke: '#000000',
         strokeThickness: 2,

@@ -66,7 +66,7 @@ export class DialogueScene extends Phaser.Scene {
     box.setDepth(51);
 
     const header = this.add.text(40, boxY - (boxHeight / 2) + 20, `💬 ${this.npc.persona.name} (${this.npc.persona.role})`, {
-      fontSize: '18px',
+      fontSize: '38px',
       color: '#ffcc00',
       stroke: '#000000',
       strokeThickness: 2,
@@ -81,7 +81,7 @@ export class DialogueScene extends Phaser.Scene {
       boxY + (boxHeight / 2) + 20,
       'Type your message and press Enter | Press Escape to leave',
       {
-        fontSize: '12px',
+        fontSize: '26px',
         color: '#888888',
         resolution: window.devicePixelRatio,
       }
@@ -107,7 +107,7 @@ export class DialogueScene extends Phaser.Scene {
       'padding: 10px',
       'border-radius: 4px',
       'font-family: monospace',
-      'font-size: 14px',
+      'font-size: 30px',
       'line-height: 1.5',
       'color: #ffffff',
     ].join('; ');
@@ -135,7 +135,7 @@ export class DialogueScene extends Phaser.Scene {
     this.inputElement.style.cssText = [
       `width: ${GAME_WIDTH - 80}px`,
       'padding: 10px 12px',
-      'font-size: 14px',
+      'font-size: 30px',
       'background: #2a2a4e',
       'color: #ffffff',
       'border: 1px solid #4488ff',

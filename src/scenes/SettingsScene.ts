@@ -5,7 +5,7 @@ import { EventBus, Events } from '../world/EventBus';
 const INPUT_STYLE = [
   'width: 380px',
   'padding: 10px',
-  'font-size: 16px',
+  'font-size: 34px',
   'background: #2a2a4e',
   'color: #ffffff',
   'border: 1px solid #4488ff',
@@ -49,7 +49,7 @@ export class SettingsScene extends Phaser.Scene {
     panel.setDepth(51);
 
     const title = this.add.text(panelX, panelY - 170, '⚙️ LLM Settings', {
-      fontSize: '28px',
+      fontSize: '56px',
       color: '#ffcc00',
       stroke: '#000000',
       strokeThickness: 3,
@@ -59,7 +59,7 @@ export class SettingsScene extends Phaser.Scene {
     title.setDepth(52);
 
     const labelStyle: Phaser.Types.GameObjects.Text.TextStyle = {
-      fontSize: '16px',
+      fontSize: '34px',
       color: '#aaccff',
       resolution: window.devicePixelRatio,
     };
@@ -85,7 +85,7 @@ export class SettingsScene extends Phaser.Scene {
     this.domElements.push(apiDom);
 
     const toggleBtn = this.add.text(centerX + 235, centerY - 108, '👁️', {
-      fontSize: '18px',
+      fontSize: '38px',
       resolution: window.devicePixelRatio,
     });
     toggleBtn.setOrigin(0.5);
@@ -126,7 +126,7 @@ export class SettingsScene extends Phaser.Scene {
     saveBtn.setInteractive({ useHandCursor: true });
 
     const saveText = this.add.text(centerX - 80, centerY + 140, 'Save', {
-      fontSize: '20px',
+      fontSize: '42px',
       color: '#ffffff',
       resolution: window.devicePixelRatio,
     });
@@ -147,7 +147,7 @@ export class SettingsScene extends Phaser.Scene {
     const cancelLabel = isFirstRun ? 'Skip' : 'Cancel';
 
     const cancelText = this.add.text(centerX + 80, centerY + 140, cancelLabel, {
-      fontSize: '20px',
+      fontSize: '42px',
       color: '#ffffff',
       resolution: window.devicePixelRatio,
     });
