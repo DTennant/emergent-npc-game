@@ -85,7 +85,7 @@ export class HUDScene extends Phaser.Scene {
     this.apiStatus.setDepth(101);
 
     this.add
-      .text(GAME_WIDTH / 2, 8, 'WASD: Move | E: Talk | I: Inventory | ESC: Close', {
+      .text(GAME_WIDTH / 2, 8, 'WASD: Move | E: Talk | I: Inv | C: Craft | T: Trade | ESC: Close', {
         fontSize: '12px',
         color: '#cccccc',
         stroke: '#000000',
@@ -169,6 +169,14 @@ export class HUDScene extends Phaser.Scene {
     
     EventBus.on(Events.PLAYER_ATTACK, () => {
       this.showHint('combat', 'Press SPACE to attack! Watch your health bar.');
+    });
+
+    EventBus.on(Events.ITEM_CRAFTED, () => {
+      this.showHint('crafting_success', 'Item crafted! Visit the Forge for advanced recipes.');
+    });
+
+    EventBus.on(Events.TRADE_COMPLETE, () => {
+      this.showHint('trading', 'Trade with NPCs using T. Build trust for better prices and rare items.');
     });
 
     EventBus.on(Events.QUEST_PROGRESS, () => {
@@ -366,7 +374,7 @@ export class HUDScene extends Phaser.Scene {
 
     this.helpPanel.add(this.add.text(leftX + 200, startY, 'ACTIONS', headerStyle));
     this.helpPanel.add(this.add.text(leftX + 200, startY + 25, 
-      'E — Talk to NPC\nI — Open Inventory\nSpace — Attack\nH — Toggle Help\nESC — Close Menu', 
+      'E — Talk to NPC\nI — Open Inventory\nC — Crafting Menu\nT — Trade (near NPC)\nSpace — Attack\nH — Toggle Help\nESC — Close Menu', 
       bodyStyle
     ));
 

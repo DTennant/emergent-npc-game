@@ -11,6 +11,7 @@ import { TextureKeys } from '../assets/keys';
 import { AldricJournal, JOURNAL_PAGES } from '../story/AldricJournal';
 import { CombatSystem } from '../combat/CombatSystem';
 import { HealthBar } from '../combat/HealthBar';
+import { NPC_SHOPS } from '../crafting/TradeData';
 import {
   GAME_WIDTH,
   GAME_HEIGHT,
@@ -25,6 +26,7 @@ import {
 
 interface ItemPickupDef {
   itemId: string;
+  quantity?: number;
   x: number;
   y: number;
   label: string;
@@ -56,6 +58,8 @@ export class WorldScene extends Phaser.Scene {
   private npcs: NPC[] = [];
   private inDialogue = false;
   private inInventory = false;
+  private inCrafting = false;
+  private inTrading = false;
   private transitioning = false;
   private interactionPrompt!: Phaser.GameObjects.Text;
   private nearestNPC: NPC | null = null;
@@ -205,6 +209,28 @@ export class WorldScene extends Phaser.Scene {
       }
     });
 
+    this.input.keyboard!.addKey('C').on('down', () => {
+      if (this.inDialogue || this.transitioning || this.inTrading) return;
+      if (this.inCrafting) {
+        this.scene.stop('CraftingScene');
+        this.inCrafting = false;
+        return;
+      }
+      this.openCrafting();
+    });
+
+    this.input.keyboard!.addKey('T').on('down', () => {
+      if (this.inDialogue || this.transitioning || this.inCrafting) return;
+      if (this.inTrading) {
+        this.scene.stop('TradeScene');
+        this.inTrading = false;
+        return;
+      }
+      if (this.nearestNPC) {
+        this.openTrade(this.nearestNPC);
+      }
+    });
+
     this.spaceKey.on('down', () => {
       if (this.inDialogue || this.transitioning) return;
       this.handlePlayerAttack();
@@ -214,7 +240,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.inDialogue || this.transitioning) return;
+    if (this.inDialogue || this.transitioning || this.inCrafting || this.inTrading) return;
 
     const gs = GameState.get(this);
     gs.worldState.update(delta);
@@ -295,12 +321,19 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private createWorld(): void {
+    const gentleGrass = ['gentle_grass1', 'gentle_grass2', 'gentle_grass3', 'gentle_grass4', 'gentle_grass5', 'gentle_grass6'];
+    const hasGentle = gentleGrass.some((k) => this.textures.exists(k));
+
     const grassTiles = ['tile_grass', 'tile_grass2', 'tile_grass3', 'tile_grass4'];
-    const hasTileset = grassTiles.some((k) => this.textures.exists(k));
+    const hasRpg = grassTiles.some((k) => this.textures.exists(k));
 
     for (let x = 0; x < GAME_WIDTH; x += TILE_SIZE) {
       for (let y = 0; y < GAME_HEIGHT; y += TILE_SIZE) {
-        if (hasTileset) {
+        if (hasGentle) {
+          const tileKey = gentleGrass[Math.floor(Math.random() * gentleGrass.length)];
+          const tile = this.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, tileKey);
+          tile.setDepth(0);
+        } else if (hasRpg) {
           const tileKey = grassTiles[Math.floor(Math.random() * grassTiles.length)];
           const tile = this.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, tileKey);
           tile.setScale(2);
@@ -314,6 +347,10 @@ export class WorldScene extends Phaser.Scene {
           this.add.rectangle(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE, TILE_SIZE, color).setDepth(0);
         }
       }
+    }
+
+    if (hasGentle) {
+      this.addGentleDecoration();
     }
 
     this.buildingGroup = this.physics.add.staticGroup();
@@ -345,21 +382,34 @@ export class WorldScene extends Phaser.Scene {
         .setDepth(2);
     }
 
-    const paths = [
-      { x: 544, y: 320, w: 192, h: 12 },
-      { x: 640, y: 384, w: 12, h: 128 },
-      { x: 800, y: 480, w: 320, h: 12 },
-      { x: 320, y: 448, w: 12, h: 160 },
-      { x: 800, y: 240, w: 12, h: 96 },
+    const pathTiles = ['gentle_path1', 'gentle_path2', 'gentle_path3', 'gentle_path4'];
+    const hasGentlePath = pathTiles.some((k) => this.textures.exists(k));
+
+    const pathSegments = [
+      { startX: 400, startY: 288, endX: 672, endY: 288 },
+      { startX: 640, startY: 288, endX: 640, endY: 464 },
+      { startX: 592, startY: 464, endX: 1024, endY: 464 },
+      { startX: 320, startY: 368, endX: 320, endY: 560 },
+      { startX: 800, startY: 160, endX: 800, endY: 288 },
     ];
 
-    for (const p of paths) {
-      if (this.textures.exists('tile_path')) {
-        const pathTile = this.add.image(p.x, p.y, 'tile_path');
-        pathTile.setScale(p.w / 16, p.h / 16);
-        pathTile.setDepth(0);
+    for (const seg of pathSegments) {
+      if (hasGentlePath) {
+        const dx = seg.endX - seg.startX;
+        const dy = seg.endY - seg.startY;
+        const steps = Math.max(Math.abs(dx), Math.abs(dy)) / TILE_SIZE;
+        for (let i = 0; i <= steps; i++) {
+          const px = seg.startX + (dx / steps) * i;
+          const py = seg.startY + (dy / steps) * i;
+          const tileKey = pathTiles[Math.floor(Math.random() * pathTiles.length)];
+          this.add.image(px, py, tileKey).setDepth(0.5);
+        }
       } else {
-        this.add.rectangle(p.x, p.y, p.w, p.h, COLORS.path, 0.6).setDepth(0);
+        const w = Math.max(12, Math.abs(seg.endX - seg.startX));
+        const h = Math.max(12, Math.abs(seg.endY - seg.startY));
+        const cx = (seg.startX + seg.endX) / 2;
+        const cy = (seg.startY + seg.endY) / 2;
+        this.add.rectangle(cx, cy, w, h, COLORS.path, 0.6).setDepth(0.5);
       }
     }
 
@@ -390,6 +440,62 @@ export class WorldScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
     });
+  }
+
+  private addGentleDecoration(): void {
+    const treeTiles = [
+      'gentle_tree1', 'gentle_tree2', 'gentle_tree3', 'gentle_tree4',
+      'gentle_tree5', 'gentle_tree6', 'gentle_tree7', 'gentle_tree8',
+    ];
+    const availableTrees = treeTiles.filter((k) => this.textures.exists(k));
+
+    if (availableTrees.length > 0) {
+      const treePositions = [
+        { x: 48, y: 48 }, { x: 112, y: 96 }, { x: 48, y: 192 },
+        { x: 1200, y: 48 }, { x: 1232, y: 160 }, { x: 1200, y: 288 },
+        { x: 48, y: 800 }, { x: 112, y: 880 }, { x: 48, y: 720 },
+        { x: 1200, y: 720 }, { x: 1232, y: 800 }, { x: 1200, y: 880 },
+        { x: 400, y: 48 }, { x: 500, y: 80 }, { x: 880, y: 48 },
+        { x: 200, y: 880 }, { x: 600, y: 880 }, { x: 1000, y: 880 },
+      ];
+
+      for (const pos of treePositions) {
+        for (let dy = 0; dy < 2; dy++) {
+          for (let dx = 0; dx < 2; dx++) {
+            const idx = dy * 2 + dx;
+            if (idx < availableTrees.length) {
+              const tile = this.add.image(pos.x + dx * 32, pos.y + dy * 32, availableTrees[idx]);
+              tile.setDepth(2);
+            }
+          }
+        }
+      }
+    }
+
+    const flowerTiles = ['gentle_flower1', 'gentle_flower2', 'gentle_flower3'];
+    const availableFlowers = flowerTiles.filter((k) => this.textures.exists(k));
+
+    if (availableFlowers.length > 0) {
+      const flowerPositions = [
+        { x: 300, y: 200 }, { x: 900, y: 350 }, { x: 500, y: 600 },
+        { x: 700, y: 700 }, { x: 1100, y: 400 }, { x: 200, y: 450 },
+      ];
+      for (const pos of flowerPositions) {
+        const key = availableFlowers[Math.floor(Math.random() * availableFlowers.length)];
+        this.add.image(pos.x, pos.y, key).setDepth(0.5);
+      }
+    }
+
+    if (this.textures.exists('gentle_water1') && this.textures.exists('gentle_water2')) {
+      const pondX = 160;
+      const pondY = 160;
+      for (let dx = 0; dx < 3; dx++) {
+        for (let dy = 0; dy < 2; dy++) {
+          const key = (dx + dy) % 2 === 0 ? 'gentle_water1' : 'gentle_water2';
+          this.add.image(pondX + dx * 32, pondY + dy * 32, key).setDepth(0.5);
+        }
+      }
+    }
   }
 
   private handlePlayerMovement(): void {
@@ -442,7 +548,9 @@ export class WorldScene extends Phaser.Scene {
 
     if (closest) {
       this.interactionPrompt.setPosition(closest.sprite.x, closest.sprite.y - TILE_SIZE * 1.2);
-      this.interactionPrompt.setText(`[E] Talk to ${closest.persona.name}`);
+      const hasShop = NPC_SHOPS[closest.persona.id] !== undefined;
+      const tradeHint = hasShop ? '  [T] Trade' : '';
+      this.interactionPrompt.setText(`[E] Talk to ${closest.persona.name}${tradeHint}`);
       this.interactionPrompt.setVisible(true);
     } else if (this.isNearShrine()) {
       this.interactionPrompt.setPosition(640, 61);
@@ -556,6 +664,10 @@ export class WorldScene extends Phaser.Scene {
     const pickups: ItemPickupDef[] = [
       { itemId: 'wooden_sword', x: 1100, y: 480, label: 'Wooden Sword' },
       { itemId: 'health_potion', x: 680, y: 130, label: 'Health Potion' },
+      { itemId: 'gold', quantity: 25, x: 450, y: 350, label: 'Gold (25)' },
+      { itemId: 'wood', x: 200, y: 700, label: 'Wood' },
+      { itemId: 'stone', x: 950, y: 200, label: 'Stone' },
+      { itemId: 'plant_fiber', x: 350, y: 550, label: 'Plant Fiber' },
     ];
 
     for (const def of pickups) {
@@ -603,7 +715,7 @@ export class WorldScene extends Phaser.Scene {
       const dx = this.player.x - pickup.def.x;
       const dy = this.player.y - pickup.def.y;
       if (Math.sqrt(dx * dx + dy * dy) < INTERACTION_DISTANCE) {
-        gs.inventory.addItem(pickup.def.itemId);
+        gs.inventory.addItem(pickup.def.itemId, pickup.def.quantity ?? 1);
         this.tweens.killTweensOf(pickup.sprite);
         pickup.sprite.destroy();
         pickup.label.destroy();
@@ -869,6 +981,57 @@ export class WorldScene extends Phaser.Scene {
         gs.worldState.resume();
         EventBus.emit(Events.DIALOGUE_END, { npcId: npc.persona.id });
       },
+    });
+  }
+
+  private getNPCTrustMap(): Record<string, number> {
+    const trustMap: Record<string, number> = {};
+    for (const npc of this.npcs) {
+      const rel = npc.memory.getRelationship('player');
+      trustMap[npc.persona.id] = rel.trust;
+    }
+    return trustMap;
+  }
+
+  private isNearBench(): boolean {
+    const forgeX = 368;
+    const forgeY = 288;
+    const dx = this.player.x - forgeX;
+    const dy = this.player.y - forgeY;
+    return Math.sqrt(dx * dx + dy * dy) < INTERACTION_DISTANCE * 2;
+  }
+
+  private openCrafting(): void {
+    const gs = GameState.get(this);
+    this.inCrafting = true;
+    this.scene.launch('CraftingScene', {
+      inventory: gs.inventory,
+      npcTrustMap: this.getNPCTrustMap(),
+      atBench: this.isNearBench(),
+    });
+    this.scene.get('CraftingScene').events.once('shutdown', () => {
+      this.inCrafting = false;
+    });
+  }
+
+  private openTrade(npc: NPC): void {
+    const shop = NPC_SHOPS[npc.persona.id];
+    if (!shop) {
+      EventBus.emit(Events.SHOW_NOTIFICATION, {
+        message: `${npc.persona.name} doesn't have anything to trade.`,
+      });
+      return;
+    }
+    const gs = GameState.get(this);
+    const rel = npc.memory.getRelationship('player');
+    this.inTrading = true;
+    this.scene.launch('TradeScene', {
+      inventory: gs.inventory,
+      shop,
+      trust: rel.trust,
+    });
+    this.scene.get('TradeScene').events.once('shutdown', () => {
+      this.inTrading = false;
     });
   }
 

@@ -31,8 +31,9 @@ export class BootScene extends Phaser.Scene {
       frameHeight: 32,
     });
 
-    // Load RPG tileset for terrain backgrounds
     this.load.image('rpg_tileset', 'assets/rpg-tileset.png');
+    this.load.image('gentle_tileset', 'assets/gentle-obj.png');
+    this.load.image('forest_tileset', 'assets/forest.png');
   }
 
   create(): void {
@@ -41,6 +42,8 @@ export class BootScene extends Phaser.Scene {
     this.generateTextures();
     this.upgradeToSpritesheetCharacters();
     this.extractTilesetTextures();
+    this.extractGentleTiles();
+    this.extractForestTiles();
 
     // Disabled: Kenney spritesheet frame indices need remapping
     // this.upgradeTextures();
@@ -931,6 +934,80 @@ export class BootScene extends Phaser.Scene {
 
     const bossWraithSz = Math.floor(TILE_SIZE * 1.5);
     this.upgradeTexture(TextureKeys.BOSS_BLIGHT_WRAITH, f(24, 2), bossWraithSz, bossWraithSz);
+  }
+
+  private extractGentleTiles(): void {
+    if (!this.textures.exists('gentle_tileset')) return;
+    const source = this.textures.get('gentle_tileset').getSourceImage() as HTMLImageElement;
+    const COLS = 45;
+
+    const tileXY = (tileId: number): { x: number; y: number } => {
+      const col = tileId % COLS;
+      const row = Math.floor(tileId / COLS);
+      return { x: col * 32, y: row * 32 };
+    };
+
+    const extractById = (key: string, tileId: number) => {
+      const { x, y } = tileXY(tileId);
+      this.extractTile(source, key, x, y, 32, 32);
+    };
+
+    extractById('gentle_grass1', 271);
+    extractById('gentle_grass2', 272);
+    extractById('gentle_grass3', 273);
+    extractById('gentle_grass4', 278);
+    extractById('gentle_grass5', 279);
+    extractById('gentle_grass6', 280);
+
+    extractById('gentle_path1', 406);
+    extractById('gentle_path2', 407);
+    extractById('gentle_path3', 451);
+    extractById('gentle_path4', 452);
+
+    extractById('gentle_water1', 962);
+    extractById('gentle_water2', 1007);
+
+    extractById('gentle_fence1', 180);
+    extractById('gentle_fence2', 225);
+    extractById('gentle_fence3', 315);
+
+    extractById('gentle_house1', 0);
+    extractById('gentle_house2', 45);
+    extractById('gentle_house3', 90);
+    extractById('gentle_house4', 135);
+    extractById('gentle_house5', 1);
+    extractById('gentle_house6', 136);
+
+    extractById('gentle_tree1', 731);
+    extractById('gentle_tree2', 776);
+    extractById('gentle_tree3', 821);
+    extractById('gentle_tree4', 866);
+    extractById('gentle_tree5', 732);
+    extractById('gentle_tree6', 777);
+    extractById('gentle_tree7', 822);
+    extractById('gentle_tree8', 867);
+
+    extractById('gentle_flower1', 233);
+    extractById('gentle_flower2', 234);
+    extractById('gentle_flower3', 235);
+  }
+
+  private extractForestTiles(): void {
+    if (!this.textures.exists('forest_tileset')) return;
+    const source = this.textures.get('forest_tileset').getSourceImage() as HTMLImageElement;
+
+    this.extractTile(source, 'forest_ground1', 0, 0, 32, 32);
+    this.extractTile(source, 'forest_ground2', 32, 0, 32, 32);
+    this.extractTile(source, 'forest_ground3', 64, 0, 32, 32);
+    this.extractTile(source, 'forest_ground4', 96, 0, 32, 32);
+    this.extractTile(source, 'forest_tree1', 0, 32, 32, 32);
+    this.extractTile(source, 'forest_tree2', 32, 32, 32, 32);
+    this.extractTile(source, 'forest_tree3', 0, 64, 32, 32);
+    this.extractTile(source, 'forest_tree4', 32, 64, 32, 32);
+    this.extractTile(source, 'forest_dark1', 128, 0, 32, 32);
+    this.extractTile(source, 'forest_dark2', 160, 0, 32, 32);
+    this.extractTile(source, 'forest_dark3', 128, 32, 32, 32);
+    this.extractTile(source, 'forest_dark4', 160, 32, 32, 32);
   }
 
   private upgradeTexture(key: string, frameIndex: number, width: number, height: number): void {

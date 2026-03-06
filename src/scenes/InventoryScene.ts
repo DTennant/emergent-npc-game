@@ -20,6 +20,7 @@ const TYPE_COLORS: Record<string, number> = {
   consumable: 0x44cc44,
   quest: 0xccaa44,
   material: 0x888888,
+  armor: 0x6688bb,
 };
 
 export class InventoryScene extends Phaser.Scene {

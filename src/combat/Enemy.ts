@@ -22,8 +22,10 @@ export const WOLF_CONFIG: EnemyConfig = {
   aggroRange: TILE_SIZE * 5,
   attackCooldown: 1500,
   drops: [
-    { itemId: 'raw_iron', quantity: 1, chance: 0.3 },
-    { itemId: 'health_potion', quantity: 1, chance: 0.2 },
+    { itemId: 'wolf_pelt', quantity: 1, chance: 0.6 },
+    { itemId: 'raw_iron', quantity: 1, chance: 0.2 },
+    { itemId: 'gold', quantity: 5, chance: 0.5 },
+    { itemId: 'plant_fiber', quantity: 2, chance: 0.4 },
   ],
 };
 

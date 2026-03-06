@@ -47,6 +47,12 @@ export const Events = {
   RUNESTONE_OBTAINED: 'quest:runestone_obtained',
   SHRINE_ACTIVATED: 'quest:shrine_activated',
 
+  // Crafting events
+  ITEM_CRAFTED: 'craft:item_crafted',
+
+  // Trade events
+  TRADE_COMPLETE: 'trade:complete',
+
   // UI events
   SHOW_NOTIFICATION: 'ui:notification',
   UPDATE_HUD: 'ui:update_hud',

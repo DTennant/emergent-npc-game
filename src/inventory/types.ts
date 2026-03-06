@@ -2,11 +2,12 @@ export interface ItemDef {
   id: string;
   name: string;
   description: string;
-  type: 'weapon' | 'tool' | 'consumable' | 'quest' | 'material';
+  type: 'weapon' | 'tool' | 'consumable' | 'quest' | 'material' | 'armor';
   equipSlot?: 'weapon' | 'lantern' | 'accessory';
   stats?: { damage?: number; defense?: number };
   stackable: boolean;
   maxStack: number;
+  value?: number; // base gold value for trading (buy price; sell = floor(value / 2))
 }
 
 export interface InventorySlot {
@@ -24,6 +25,7 @@ export const ITEMS: Record<string, ItemDef> = {
     stats: { damage: 5 },
     stackable: false,
     maxStack: 1,
+    value: 10,
   },
   iron_sword: {
     id: 'iron_sword',
@@ -34,6 +36,7 @@ export const ITEMS: Record<string, ItemDef> = {
     stats: { damage: 12 },
     stackable: false,
     maxStack: 1,
+    value: 60,
   },
   enchanted_blade: {
     id: 'enchanted_blade',
@@ -44,6 +47,40 @@ export const ITEMS: Record<string, ItemDef> = {
     stats: { damage: 20 },
     stackable: false,
     maxStack: 1,
+    value: 200,
+  },
+  stone_axe: {
+    id: 'stone_axe',
+    name: 'Stone Axe',
+    description: 'A crude axe made from stone and wood. Decent for chopping.',
+    type: 'weapon',
+    equipSlot: 'weapon',
+    stats: { damage: 8 },
+    stackable: false,
+    maxStack: 1,
+    value: 25,
+  },
+  leather_armor: {
+    id: 'leather_armor',
+    name: 'Leather Armor',
+    description: 'Light armor made from tanned hides. Offers basic protection.',
+    type: 'armor',
+    equipSlot: 'accessory',
+    stats: { defense: 5 },
+    stackable: false,
+    maxStack: 1,
+    value: 40,
+  },
+  iron_shield: {
+    id: 'iron_shield',
+    name: 'Iron Shield',
+    description: 'A sturdy iron shield. Reduces incoming damage.',
+    type: 'armor',
+    equipSlot: 'accessory',
+    stats: { defense: 10 },
+    stackable: false,
+    maxStack: 1,
+    value: 80,
   },
   lantern: {
     id: 'lantern',
@@ -53,6 +90,7 @@ export const ITEMS: Record<string, ItemDef> = {
     equipSlot: 'lantern',
     stackable: false,
     maxStack: 1,
+    value: 30,
   },
   rope: {
     id: 'rope',
@@ -61,6 +99,7 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'tool',
     stackable: false,
     maxStack: 1,
+    value: 20,
   },
   herb_pouch: {
     id: 'herb_pouch',
@@ -69,14 +108,34 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'tool',
     stackable: false,
     maxStack: 1,
+    value: 15,
   },
   health_potion: {
     id: 'health_potion',
     name: 'Health Potion',
-    description: 'A restorative brew made from forest herbs. Heals minor wounds.',
+    description: 'A restorative brew made from forest herbs. Heals 40 HP.',
     type: 'consumable',
     stackable: true,
     maxStack: 10,
+    value: 25,
+  },
+  blight_ward: {
+    id: 'blight_ward',
+    name: 'Blight Ward',
+    description: 'A protective charm that reduces Blight damage. Faintly warm.',
+    type: 'consumable',
+    stackable: true,
+    maxStack: 5,
+    value: 50,
+  },
+  provisions: {
+    id: 'provisions',
+    name: 'Provisions',
+    description: 'Dried meat and bread. Restores 20 HP over time.',
+    type: 'consumable',
+    stackable: true,
+    maxStack: 20,
+    value: 8,
   },
   raw_iron: {
     id: 'raw_iron',
@@ -85,6 +144,52 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'material',
     stackable: true,
     maxStack: 20,
+    value: 12,
+  },
+  wood: {
+    id: 'wood',
+    name: 'Wood',
+    description: 'A bundle of sturdy wood. Used for crafting and building.',
+    type: 'material',
+    stackable: true,
+    maxStack: 30,
+    value: 5,
+  },
+  stone: {
+    id: 'stone',
+    name: 'Stone',
+    description: 'A chunk of hard stone. Useful for tools and construction.',
+    type: 'material',
+    stackable: true,
+    maxStack: 30,
+    value: 4,
+  },
+  leather: {
+    id: 'leather',
+    name: 'Leather',
+    description: 'Tanned animal hide. Used for armor and pouches.',
+    type: 'material',
+    stackable: true,
+    maxStack: 20,
+    value: 10,
+  },
+  plant_fiber: {
+    id: 'plant_fiber',
+    name: 'Plant Fiber',
+    description: 'Tough fibers harvested from forest plants. Used for rope and cloth.',
+    type: 'material',
+    stackable: true,
+    maxStack: 30,
+    value: 3,
+  },
+  glass_vial: {
+    id: 'glass_vial',
+    name: 'Glass Vial',
+    description: 'An empty vial suitable for holding potions.',
+    type: 'material',
+    stackable: true,
+    maxStack: 10,
+    value: 8,
   },
   moonpetal: {
     id: 'moonpetal',
@@ -93,6 +198,7 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'material',
     stackable: true,
     maxStack: 10,
+    value: 20,
   },
   enchantment_dust: {
     id: 'enchantment_dust',
@@ -101,6 +207,16 @@ export const ITEMS: Record<string, ItemDef> = {
     type: 'material',
     stackable: true,
     maxStack: 5,
+    value: 50,
+  },
+  wolf_pelt: {
+    id: 'wolf_pelt',
+    name: 'Wolf Pelt',
+    description: 'A grey pelt from a forest wolf. Can be tanned into leather.',
+    type: 'material',
+    stackable: true,
+    maxStack: 10,
+    value: 15,
   },
   runestone_forest: {
     id: 'runestone_forest',
@@ -172,6 +288,6 @@ export const ITEMS: Record<string, ItemDef> = {
     description: 'The common currency of Thornwick and the surrounding lands.',
     type: 'material',
     stackable: true,
-    maxStack: 999,
+    maxStack: 9999,
   },
 };

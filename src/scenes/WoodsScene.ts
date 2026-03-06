@@ -231,13 +231,21 @@ export class WoodsScene extends Phaser.Scene {
   }
 
   private createForestWorld(): void {
-    const forestTiles = ['tile_forest', 'tile_forest2', 'tile_forest3', 'tile_forest4'];
-    const hasTileset = forestTiles.some((k) => this.textures.exists(k));
+    const newForestTiles = ['forest_ground1', 'forest_ground2', 'forest_ground3', 'forest_ground4',
+                            'forest_dark1', 'forest_dark2', 'forest_dark3', 'forest_dark4'];
+    const hasNewForest = newForestTiles.some((k) => this.textures.exists(k));
+
+    const oldForestTiles = ['tile_forest', 'tile_forest2', 'tile_forest3', 'tile_forest4'];
+    const hasOldForest = oldForestTiles.some((k) => this.textures.exists(k));
 
     for (let x = 0; x < GAME_WIDTH; x += TILE_SIZE) {
       for (let y = 0; y < GAME_HEIGHT; y += TILE_SIZE) {
-        if (hasTileset) {
-          const tileKey = forestTiles[Math.floor(Math.random() * forestTiles.length)];
+        if (hasNewForest) {
+          const availTiles = newForestTiles.filter((k) => this.textures.exists(k));
+          const tileKey = availTiles[Math.floor(Math.random() * availTiles.length)];
+          this.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, tileKey).setDepth(0);
+        } else if (hasOldForest) {
+          const tileKey = oldForestTiles[Math.floor(Math.random() * oldForestTiles.length)];
           const tile = this.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, tileKey);
           tile.setScale(2);
           tile.setDepth(0);
@@ -292,8 +300,19 @@ export class WoodsScene extends Phaser.Scene {
       { x: 250, y: 850 }, { x: 550, y: 900 }, { x: 1150, y: 850 },
     ];
 
+    const forestTreeKeys = ['forest_tree1', 'forest_tree2', 'forest_tree3', 'forest_tree4'];
+    const hasForestTrees = forestTreeKeys.some((k) => this.textures.exists(k));
+
     for (const pos of treePositions) {
-      if (this.textures.exists('tile_tree')) {
+      if (hasForestTrees) {
+        const available = forestTreeKeys.filter((k) => this.textures.exists(k));
+        for (let dx = 0; dx < 2; dx++) {
+          for (let dy = 0; dy < 2; dy++) {
+            const key = available[Math.floor(Math.random() * available.length)];
+            this.add.image(pos.x + dx * 32, pos.y + dy * 32, key).setDepth(2);
+          }
+        }
+      } else if (this.textures.exists('tile_tree')) {
         const tree = this.add.image(pos.x, pos.y, 'tile_tree');
         tree.setScale(3);
         tree.setDepth(2);
@@ -422,6 +441,14 @@ export class WoodsScene extends Phaser.Scene {
       { itemId: 'lantern', x: 1100, y: 350, label: 'Lantern' },
       { itemId: 'rope', x: 900, y: 800, label: 'Rope' },
       { itemId: 'health_potion', x: 400, y: 600, label: 'Health Potion' },
+      { itemId: 'moonpetal', x: 650, y: 150, label: 'Moonpetal' },
+      { itemId: 'wood', x: 300, y: 300, label: 'Wood' },
+      { itemId: 'wood', x: 800, y: 600, label: 'Wood' },
+      { itemId: 'stone', x: 550, y: 450, label: 'Stone' },
+      { itemId: 'plant_fiber', x: 200, y: 700, label: 'Plant Fiber' },
+      { itemId: 'plant_fiber', x: 1000, y: 400, label: 'Plant Fiber' },
+      { itemId: 'raw_iron', x: 1150, y: 600, label: 'Raw Iron' },
+      { itemId: 'glass_vial', x: 750, y: 350, label: 'Glass Vial' },
     ];
 
     for (const def of pickups) {
