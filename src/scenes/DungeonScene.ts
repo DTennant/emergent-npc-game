@@ -47,6 +47,8 @@ export class DungeonScene extends Phaser.Scene {
   private roomLabel!: Phaser.GameObjects.Text;
   private escLabel!: Phaser.GameObjects.Text;
   private dungeonCleared = false;
+  private loadingRoom = false;
+  private cleanedUp = false;
   private deathHandler!: () => void;
   private entityDiedHandler!: (data: { entity: string; drops: { itemId: string; quantity: number }[] }) => void;
 
@@ -64,6 +66,7 @@ export class DungeonScene extends Phaser.Scene {
     this.inventory = data.inventory;
     this.currentRoom = 0;
     this.dungeonCleared = false;
+    this.cleanedUp = false;
   }
 
   create(): void {
@@ -270,6 +273,8 @@ export class DungeonScene extends Phaser.Scene {
         this.player,
         this.doorZone,
         () => {
+          if (this.loadingRoom) return;
+          this.loadingRoom = true;
           this.loadRoom(nextRoom);
         },
         undefined,
@@ -289,6 +294,7 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     this.player.setPosition(room.spawnPoint.x, room.spawnPoint.y);
+    this.loadingRoom = false;
   }
 
   private clearRoom(): void {
@@ -350,9 +356,10 @@ export class DungeonScene extends Phaser.Scene {
       allTargets.push(this.boss);
     }
 
+    const colliders: Phaser.Physics.Arcade.Collider[] = [];
     for (const target of allTargets) {
       if (target.isDead()) continue;
-      this.physics.add.overlap(
+      const collider = this.physics.add.overlap(
         zone,
         target.sprite,
         () => {
@@ -364,7 +371,13 @@ export class DungeonScene extends Phaser.Scene {
         undefined,
         this
       );
+      colliders.push(collider);
     }
+    this.time.delayedCall(100, () => {
+      for (const c of colliders) {
+        this.physics.world.removeCollider(c);
+      }
+    });
   }
 
   private checkEnemyAttacks(): void {
@@ -386,7 +399,7 @@ export class DungeonScene extends Phaser.Scene {
         this.combatSystem.handlePlayerDamage(config.damage, {
           x: target.sprite.x,
           y: target.sprite.y,
-        });
+        }, this.inventory);
       }
     }
   }
@@ -415,6 +428,8 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private cleanup(): void {
+    if (this.cleanedUp) return;
+    this.cleanedUp = true;
     EventBus.off(Events.PLAYER_DIED, this.deathHandler);
     EventBus.off(Events.ENTITY_DIED, this.entityDiedHandler);
     this.clearRoom();

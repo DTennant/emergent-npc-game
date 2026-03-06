@@ -202,7 +202,7 @@ export class WorldScene extends Phaser.Scene {
         this.inInventory = false;
       } else {
         this.inInventory = true;
-        this.scene.launch('InventoryScene', { inventory: gs2.inventory });
+        this.scene.launch('InventoryScene', { inventory: gs2.inventory, combatSystem: this.combatSystem });
         this.scene.get('InventoryScene').events.once('shutdown', () => {
           this.inInventory = false;
         });
@@ -210,7 +210,7 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.input.keyboard!.addKey('C').on('down', () => {
-      if (this.inDialogue || this.transitioning || this.inTrading) return;
+      if (this.inDialogue || this.transitioning || this.inTrading || this.inInventory) return;
       if (this.inCrafting) {
         this.scene.stop('CraftingScene');
         this.inCrafting = false;
@@ -220,7 +220,7 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.input.keyboard!.addKey('T').on('down', () => {
-      if (this.inDialogue || this.transitioning || this.inCrafting) return;
+      if (this.inDialogue || this.transitioning || this.inCrafting || this.inInventory) return;
       if (this.inTrading) {
         this.scene.stop('TradeScene');
         this.inTrading = false;
@@ -321,8 +321,9 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private createWorld(): void {
-    const gentleGrass = ['gentle_grass1', 'gentle_grass2', 'gentle_grass3', 'gentle_grass4', 'gentle_grass5', 'gentle_grass6'];
-    const hasGentle = gentleGrass.some((k) => this.textures.exists(k));
+    const gentleDominant = 'gentle_grass1';
+    const gentleAccent = 'gentle_grass2';
+    const hasGentle = this.textures.exists(gentleDominant);
 
     const grassTiles = ['tile_grass', 'tile_grass2', 'tile_grass3', 'tile_grass4'];
     const hasRpg = grassTiles.some((k) => this.textures.exists(k));
@@ -330,7 +331,8 @@ export class WorldScene extends Phaser.Scene {
     for (let x = 0; x < GAME_WIDTH; x += TILE_SIZE) {
       for (let y = 0; y < GAME_HEIGHT; y += TILE_SIZE) {
         if (hasGentle) {
-          const tileKey = gentleGrass[Math.floor(Math.random() * gentleGrass.length)];
+          const useAccent = Math.random() < 0.15;
+          const tileKey = useAccent && this.textures.exists(gentleAccent) ? gentleAccent : gentleDominant;
           const tile = this.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, tileKey);
           tile.setDepth(0);
         } else if (hasRpg) {
@@ -401,7 +403,9 @@ export class WorldScene extends Phaser.Scene {
         for (let i = 0; i <= steps; i++) {
           const px = seg.startX + (dx / steps) * i;
           const py = seg.startY + (dy / steps) * i;
-          const tileKey = pathTiles[Math.floor(Math.random() * pathTiles.length)];
+          const gridX = Math.floor(px / TILE_SIZE);
+          const gridY = Math.floor(py / TILE_SIZE);
+          const tileKey = pathTiles[(gridX + gridY) % 2 === 0 ? 0 : 1];
           this.add.image(px, py, tileKey).setDepth(0.5);
         }
       } else {
@@ -443,30 +447,33 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private addGentleDecoration(): void {
-    const treeTiles = [
-      'gentle_tree1', 'gentle_tree2', 'gentle_tree3', 'gentle_tree4',
-      'gentle_tree5', 'gentle_tree6', 'gentle_tree7', 'gentle_tree8',
+    // Tree tiles form a 2-wide × 4-tall assembly (8 tiles per tree)
+    // Row 0: gentle_tree1, gentle_tree5
+    // Row 1: gentle_tree2, gentle_tree6
+    // Row 2: gentle_tree3, gentle_tree7
+    // Row 3: gentle_tree4, gentle_tree8
+    const treeGrid = [
+      ['gentle_tree1', 'gentle_tree5'],
+      ['gentle_tree2', 'gentle_tree6'],
+      ['gentle_tree3', 'gentle_tree7'],
+      ['gentle_tree4', 'gentle_tree8'],
     ];
-    const availableTrees = treeTiles.filter((k) => this.textures.exists(k));
+    const hasAllTrees = treeGrid.every((row) => row.every((k) => this.textures.exists(k)));
 
-    if (availableTrees.length > 0) {
+    if (hasAllTrees) {
       const treePositions = [
-        { x: 48, y: 48 }, { x: 112, y: 96 }, { x: 48, y: 192 },
-        { x: 1200, y: 48 }, { x: 1232, y: 160 }, { x: 1200, y: 288 },
-        { x: 48, y: 800 }, { x: 112, y: 880 }, { x: 48, y: 720 },
-        { x: 1200, y: 720 }, { x: 1232, y: 800 }, { x: 1200, y: 880 },
-        { x: 400, y: 48 }, { x: 500, y: 80 }, { x: 880, y: 48 },
-        { x: 200, y: 880 }, { x: 600, y: 880 }, { x: 1000, y: 880 },
+        { x: 48, y: 32 }, { x: 112, y: 64 },
+        { x: 1200, y: 32 }, { x: 1200, y: 256 },
+        { x: 48, y: 720 }, { x: 48, y: 800 },
+        { x: 1200, y: 720 }, { x: 1200, y: 800 },
+        { x: 480, y: 48 }, { x: 960, y: 48 },
       ];
 
       for (const pos of treePositions) {
-        for (let dy = 0; dy < 2; dy++) {
-          for (let dx = 0; dx < 2; dx++) {
-            const idx = dy * 2 + dx;
-            if (idx < availableTrees.length) {
-              const tile = this.add.image(pos.x + dx * 32, pos.y + dy * 32, availableTrees[idx]);
-              tile.setDepth(2);
-            }
+        for (let row = 0; row < 4; row++) {
+          for (let col = 0; col < 2; col++) {
+            const tile = this.add.image(pos.x + col * 32, pos.y + row * 32, treeGrid[row][col]);
+            tile.setDepth(2);
           }
         }
       }
@@ -477,8 +484,7 @@ export class WorldScene extends Phaser.Scene {
 
     if (availableFlowers.length > 0) {
       const flowerPositions = [
-        { x: 300, y: 200 }, { x: 900, y: 350 }, { x: 500, y: 600 },
-        { x: 700, y: 700 }, { x: 1100, y: 400 }, { x: 200, y: 450 },
+        { x: 300, y: 200 }, { x: 750, y: 350 }, { x: 500, y: 600 },
       ];
       for (const pos of flowerPositions) {
         const key = availableFlowers[Math.floor(Math.random() * availableFlowers.length)];
@@ -717,7 +723,9 @@ export class WorldScene extends Phaser.Scene {
       if (Math.sqrt(dx * dx + dy * dy) < INTERACTION_DISTANCE) {
         gs.inventory.addItem(pickup.def.itemId, pickup.def.quantity ?? 1);
         this.tweens.killTweensOf(pickup.sprite);
+        pickup.sprite.setVisible(false);
         pickup.sprite.destroy();
+        pickup.label.setVisible(false);
         pickup.label.destroy();
         this.itemPickups.splice(i, 1);
         EventBus.emit(Events.SHOW_NOTIFICATION, { message: `Picked up: ${pickup.def.label}` });
@@ -927,6 +935,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private handlePlayerAttack(): void {
+    const gs = GameState.get(this);
+    if (!gs.inventory.getEquipped('weapon')) return;
     const zone = this.combatSystem.attack(this.playerFacing);
     if (!zone) return;
     this.showAttackEffect(this.playerFacing);

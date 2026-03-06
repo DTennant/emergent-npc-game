@@ -131,64 +131,15 @@ export class HUDScene extends Phaser.Scene {
     settingsBtn.on('pointerover', () => settingsBtn.setScale(1.1));
     settingsBtn.on('pointerout', () => settingsBtn.setScale(1));
 
-    EventBus.on(Events.SHOW_NOTIFICATION, (data: string | { message?: string; text?: string }) => {
-      if (typeof data === 'string') {
-        this.showNotification(data);
-      } else {
-        this.showNotification(data.message ?? data.text ?? '');
-      }
-    });
-
-    EventBus.on(Events.DIALOGUE_START, (data: { npc: { persona: { name: string } } }) => {
-      this.showNotification(`Speaking with ${data.npc.persona.name}...`);
-      this.showHint('dialogue', 'Build trust by having more conversations. NPCs share knowledge as trust grows.');
-    });
-
-    EventBus.on(Events.INVENTORY_CHANGE, (data: { equipped: Record<string, string | null> }) => {
-      const weaponId = data.equipped.weapon;
-      if (weaponId && ITEMS[weaponId]) {
-        const def = ITEMS[weaponId];
-        const dmg = def.stats?.damage ? ` (dmg: ${def.stats.damage})` : '';
-        this.equippedWeaponText.setText(`Weapon: ${def.name}${dmg}`);
-        this.equippedWeaponText.setColor('#ffcc00');
-      } else {
-        this.equippedWeaponText.setText('Weapon: (none)');
-        this.equippedWeaponText.setColor('#aaaaaa');
-      }
-    });
-
-    EventBus.on(Events.ITEM_ACQUIRED, (data: { itemId: string; quantity: number }) => {
-      const def = ITEMS[data.itemId];
-      if (def) {
-        const qtyStr = data.quantity > 1 ? ` x${data.quantity}` : '';
-        this.showNotification(`Acquired: ${def.name}${qtyStr}`);
-        this.showHint('inventory_usage', 'Press I to manage items. Equip weapons and gather materials for NPCs.');
-        this.updateQuestTracker();
-      }
-    });
-    
-    EventBus.on(Events.PLAYER_ATTACK, () => {
-      this.showHint('combat', 'Press SPACE to attack! Watch your health bar.');
-    });
-
-    EventBus.on(Events.ITEM_CRAFTED, () => {
-      this.showHint('crafting_success', 'Item crafted! Visit the Forge for advanced recipes.');
-    });
-
-    EventBus.on(Events.TRADE_COMPLETE, () => {
-      this.showHint('trading', 'Trade with NPCs using T. Build trust for better prices and rare items.');
-    });
-
-    EventBus.on(Events.QUEST_PROGRESS, () => {
-        this.updateQuestTracker();
-    });
-
-    // Check low health
-    EventBus.on(Events.ENTITY_DAMAGED, (data: { entity: string, currentHealth: number, maxHealth: number }) => {
-        if (data.entity === 'player' && data.currentHealth < data.maxHealth * 0.3) {
-            this.showHint('low_health', 'Your health is low! Find safety or eat provisions.');
-        }
-    });
+    EventBus.on(Events.SHOW_NOTIFICATION, this.onShowNotification, this);
+    EventBus.on(Events.DIALOGUE_START, this.onDialogueStart, this);
+    EventBus.on(Events.INVENTORY_CHANGE, this.onInventoryChange, this);
+    EventBus.on(Events.ITEM_ACQUIRED, this.onItemAcquired, this);
+    EventBus.on(Events.PLAYER_ATTACK, this.onPlayerAttack, this);
+    EventBus.on(Events.ITEM_CRAFTED, this.onItemCrafted, this);
+    EventBus.on(Events.TRADE_COMPLETE, this.onTradeComplete, this);
+    EventBus.on(Events.QUEST_PROGRESS, this.onQuestProgress, this);
+    EventBus.on(Events.ENTITY_DAMAGED, this.onEntityDamaged, this);
 
     this.input.keyboard!.addKey('H').on('down', () => this.toggleHelp());
     this.createHelpPanel();
@@ -215,6 +166,76 @@ export class HUDScene extends Phaser.Scene {
       if (this.notificationTimer <= 0) {
         this.notificationText.setVisible(false);
       }
+    }
+  }
+
+  shutdown(): void {
+    EventBus.off(Events.SHOW_NOTIFICATION, this.onShowNotification, this);
+    EventBus.off(Events.DIALOGUE_START, this.onDialogueStart, this);
+    EventBus.off(Events.INVENTORY_CHANGE, this.onInventoryChange, this);
+    EventBus.off(Events.ITEM_ACQUIRED, this.onItemAcquired, this);
+    EventBus.off(Events.PLAYER_ATTACK, this.onPlayerAttack, this);
+    EventBus.off(Events.ITEM_CRAFTED, this.onItemCrafted, this);
+    EventBus.off(Events.TRADE_COMPLETE, this.onTradeComplete, this);
+    EventBus.off(Events.QUEST_PROGRESS, this.onQuestProgress, this);
+    EventBus.off(Events.ENTITY_DAMAGED, this.onEntityDamaged, this);
+  }
+
+  private onShowNotification(data: string | { message?: string; text?: string }): void {
+    if (typeof data === 'string') {
+      this.showNotification(data);
+    } else {
+      this.showNotification(data.message ?? data.text ?? '');
+    }
+  }
+
+  private onDialogueStart(data: { npc: { persona: { name: string } } }): void {
+    this.showNotification(`Speaking with ${data.npc.persona.name}...`);
+    this.showHint('dialogue', 'Build trust by having more conversations. NPCs share knowledge as trust grows.');
+  }
+
+  private onInventoryChange(data: { equipped: Record<string, string | null> }): void {
+    const weaponId = data.equipped.weapon;
+    if (weaponId && ITEMS[weaponId]) {
+      const def = ITEMS[weaponId];
+      const dmg = def.stats?.damage ? ` (dmg: ${def.stats.damage})` : '';
+      this.equippedWeaponText.setText(`Weapon: ${def.name}${dmg}`);
+      this.equippedWeaponText.setColor('#ffcc00');
+    } else {
+      this.equippedWeaponText.setText('Weapon: (none)');
+      this.equippedWeaponText.setColor('#aaaaaa');
+    }
+  }
+
+  private onItemAcquired(data: { itemId: string; quantity: number }): void {
+    const def = ITEMS[data.itemId];
+    if (def) {
+      const qtyStr = data.quantity > 1 ? ` x${data.quantity}` : '';
+      this.showNotification(`Acquired: ${def.name}${qtyStr}`);
+      this.showHint('inventory_usage', 'Press I to manage items. Equip weapons and gather materials for NPCs.');
+      this.updateQuestTracker();
+    }
+  }
+
+  private onPlayerAttack(): void {
+    this.showHint('combat', 'Press SPACE to attack! Watch your health bar.');
+  }
+
+  private onItemCrafted(): void {
+    this.showHint('crafting_success', 'Item crafted! Visit the Forge for advanced recipes.');
+  }
+
+  private onTradeComplete(): void {
+    this.showHint('trading', 'Trade with NPCs using T. Build trust for better prices and rare items.');
+  }
+
+  private onQuestProgress(): void {
+    this.updateQuestTracker();
+  }
+
+  private onEntityDamaged(data: { entity: string; currentHealth: number; maxHealth: number }): void {
+    if (data.entity === 'player' && data.currentHealth < data.maxHealth * 0.3) {
+      this.showHint('low_health', 'Your health is low! Find safety or eat provisions.');
     }
   }
 

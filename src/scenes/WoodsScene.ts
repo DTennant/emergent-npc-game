@@ -20,6 +20,7 @@ import {
 
 interface ItemPickupDef {
   itemId: string;
+  quantity?: number;
   x: number;
   y: number;
   label: string;
@@ -154,7 +155,7 @@ export class WoodsScene extends Phaser.Scene {
         this.inInventory = false;
       } else {
         this.inInventory = true;
-        this.scene.launch('InventoryScene', { inventory: gs.inventory });
+        this.scene.launch('InventoryScene', { inventory: gs.inventory, combatSystem: this.combatSystem });
         this.scene.get('InventoryScene').events.once('shutdown', () => {
           this.inInventory = false;
         });
@@ -507,9 +508,11 @@ export class WoodsScene extends Phaser.Scene {
       const dx = this.player.x - pickup.def.x;
       const dy = this.player.y - pickup.def.y;
       if (Math.sqrt(dx * dx + dy * dy) < INTERACTION_DISTANCE) {
-        gs.inventory.addItem(pickup.def.itemId);
+        gs.inventory.addItem(pickup.def.itemId, pickup.def.quantity ?? 1);
         this.tweens.killTweensOf(pickup.sprite);
+        pickup.sprite.setVisible(false);
         pickup.sprite.destroy();
+        pickup.label.setVisible(false);
         pickup.label.destroy();
         this.itemPickups.splice(i, 1);
         EventBus.emit(Events.SHOW_NOTIFICATION, { message: `Picked up: ${pickup.def.label}` });
@@ -583,10 +586,11 @@ export class WoodsScene extends Phaser.Scene {
 
     this.showAttackEffect(this.playerFacing);
 
+    const colliders: Phaser.Physics.Arcade.Collider[] = [];
     for (const enemy of this.enemies) {
       if (enemy.isDead()) continue;
       const gs = GameState.get(this);
-      this.physics.add.overlap(
+      const collider = this.physics.add.overlap(
         zone,
         enemy.sprite,
         () => {
@@ -599,7 +603,13 @@ export class WoodsScene extends Phaser.Scene {
         undefined,
         this
       );
+      colliders.push(collider);
     }
+    this.time.delayedCall(100, () => {
+      for (const c of colliders) {
+        this.physics.world.removeCollider(c);
+      }
+    });
   }
 
   private showAttackEffect(facing: string): void {
@@ -660,12 +670,11 @@ export class WoodsScene extends Phaser.Scene {
 
       if (dist <= TILE_SIZE) {
         const config = enemy.getConfig();
+        const gs2 = GameState.get(this);
         this.combatSystem.handlePlayerDamage(config.damage, {
           x: enemy.sprite.x,
           y: enemy.sprite.y,
-        });
-        this.player.setTint(0xff0000);
-        this.time.delayedCall(150, () => this.player.clearTint());
+        }, gs2.inventory);
       }
     }
   }
