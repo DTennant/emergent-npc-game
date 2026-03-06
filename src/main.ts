@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { LoginScene } from './scenes/LoginScene';
 import { BootScene } from './scenes/BootScene';
 import { WorldScene } from './scenes/WorldScene';
 import { DialogueScene } from './scenes/DialogueScene';
@@ -40,7 +41,7 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true,
   },
-  scene: [BootScene, WorldScene, WoodsScene, DialogueScene, HUDScene, InventoryScene, CraftingScene, TradeScene, DungeonScene, SettingsScene],
+  scene: [LoginScene, BootScene, WorldScene, WoodsScene, DialogueScene, HUDScene, InventoryScene, CraftingScene, TradeScene, DungeonScene, SettingsScene],
 };
 
 new Phaser.Game(config);

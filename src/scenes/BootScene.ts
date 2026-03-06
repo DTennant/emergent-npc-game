@@ -48,16 +48,7 @@ export class BootScene extends Phaser.Scene {
     // Disabled: Kenney spritesheet frame indices need remapping
     // this.upgradeTextures();
 
-    const apiKey = localStorage.getItem('openai_api_key');
-    if (!apiKey) {
-      this.scene.launch('SettingsScene', {
-        onClose: () => {
-          this.scene.start('WorldScene');
-        }
-      });
-    } else {
-      this.scene.start('WorldScene');
-    }
+    this.scene.start('WorldScene');
   }
 
   private createProgressBar(): void {
