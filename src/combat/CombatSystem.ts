@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { Inventory } from '../inventory/Inventory';
-import { ITEMS } from '../inventory/types';
+import { ITEMS, ItemDef } from '../inventory/types';
 import { EventBus, Events } from '../world/EventBus';
 import {
   ATTACK_COOLDOWN_MS,
@@ -9,6 +9,11 @@ import {
   INVINCIBILITY_MS,
   TILE_SIZE,
 } from '../config';
+
+const CONSUMABLE_HEAL: Record<string, number> = {
+  health_potion: 40,
+  provisions: 20,
+};
 
 export class CombatSystem {
   private scene: Phaser.Scene;
@@ -75,11 +80,24 @@ export class CombatSystem {
     return def?.stats?.damage ?? 0;
   }
 
-  handlePlayerDamage(damage: number, knockbackFrom: { x: number; y: number }): void {
+  getDefense(inventory: Inventory): number {
+    const accessoryId = inventory.getEquipped('accessory');
+    if (!accessoryId) return 0;
+    const def = ITEMS[accessoryId];
+    return def?.stats?.defense ?? 0;
+  }
+
+  handlePlayerDamage(damage: number, knockbackFrom: { x: number; y: number }, inventory?: Inventory): void {
     if (this.inIFrames) return;
     if (this.currentHealth <= 0) return;
 
-    this.currentHealth = Math.max(0, this.currentHealth - damage);
+    let finalDamage = damage;
+    if (inventory) {
+      const defense = this.getDefense(inventory);
+      finalDamage = Math.max(1, damage - defense);
+    }
+
+    this.currentHealth = Math.max(0, this.currentHealth - finalDamage);
     this.inIFrames = true;
 
     this.player.setTint(0xff0000);
@@ -95,7 +113,7 @@ export class CombatSystem {
 
     EventBus.emit(Events.ENTITY_DAMAGED, {
       entity: 'player',
-      damage,
+      damage: finalDamage,
       currentHealth: this.currentHealth,
       maxHealth: this.maxHealth,
     });
@@ -130,5 +148,25 @@ export class CombatSystem {
     this.currentHealth = this.maxHealth;
     this.inIFrames = false;
     this.player.clearTint();
+  }
+
+  useConsumable(itemId: string, inventory: Inventory): boolean {
+    const healAmount = CONSUMABLE_HEAL[itemId];
+    if (!healAmount) return false;
+    if (this.currentHealth >= this.maxHealth) return false;
+    if (!inventory.hasItem(itemId)) return false;
+
+    inventory.removeItem(itemId, 1);
+    this.restoreHealth(healAmount);
+
+    EventBus.emit(Events.ITEM_USED, { itemId, healAmount });
+    EventBus.emit(Events.ENTITY_DAMAGED, {
+      entity: 'player',
+      damage: 0,
+      currentHealth: this.currentHealth,
+      maxHealth: this.maxHealth,
+    });
+
+    return true;
   }
 }

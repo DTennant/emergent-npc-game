@@ -25,11 +25,12 @@ export class Inventory {
       const existing = this.items.find((slot) => slot.itemId === itemId);
       if (existing) {
         const canAdd = Math.min(quantity, def.maxStack - existing.quantity);
-        if (canAdd <= 0) return false;
-        existing.quantity += canAdd;
-        this.emitChange();
-        EventBus.emit(Events.ITEM_ACQUIRED, { itemId, quantity: canAdd });
-        return true;
+        if (canAdd > 0) {
+          existing.quantity += canAdd;
+          this.emitChange();
+          EventBus.emit(Events.ITEM_ACQUIRED, { itemId, quantity: canAdd });
+          return true;
+        }
       }
     }
 

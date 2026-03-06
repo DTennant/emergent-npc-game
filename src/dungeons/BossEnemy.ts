@@ -21,7 +21,12 @@ export const BOSS_CONFIGS: Record<string, BossConfig> = {
     speed: 120,
     aggroRange: TILE_SIZE * 8,
     attackCooldown: 1000,
-    drops: [{ itemId: 'runestone_forest', quantity: 1, chance: 1 }],
+    drops: [
+      { itemId: 'runestone_forest', quantity: 1, chance: 1 },
+      { itemId: 'wolf_pelt', quantity: 3, chance: 1 },
+      { itemId: 'gold', quantity: 20, chance: 1 },
+      { itemId: 'enchantment_dust', quantity: 1, chance: 0.5 },
+    ],
   },
   boss_crystal_golem: {
     bossName: 'Crystal Golem',
@@ -32,7 +37,13 @@ export const BOSS_CONFIGS: Record<string, BossConfig> = {
     speed: 40,
     aggroRange: TILE_SIZE * 6,
     attackCooldown: 2500,
-    drops: [{ itemId: 'runestone_mine', quantity: 1, chance: 1 }],
+    drops: [
+      { itemId: 'runestone_mine', quantity: 1, chance: 1 },
+      { itemId: 'raw_iron', quantity: 5, chance: 1 },
+      { itemId: 'gold', quantity: 30, chance: 1 },
+      { itemId: 'enchantment_dust', quantity: 2, chance: 0.5 },
+      { itemId: 'stone', quantity: 5, chance: 0.8 },
+    ],
   },
   boss_blight_wraith: {
     bossName: 'Blight Wraith',
@@ -43,7 +54,13 @@ export const BOSS_CONFIGS: Record<string, BossConfig> = {
     speed: 100,
     aggroRange: TILE_SIZE * 10,
     attackCooldown: 800,
-    drops: [{ itemId: 'runestone_tower', quantity: 1, chance: 1 }],
+    drops: [
+      { itemId: 'runestone_tower', quantity: 1, chance: 1 },
+      { itemId: 'enchantment_dust', quantity: 3, chance: 1 },
+      { itemId: 'gold', quantity: 25, chance: 1 },
+      { itemId: 'moonpetal', quantity: 2, chance: 0.7 },
+      { itemId: 'glass_vial', quantity: 2, chance: 0.6 },
+    ],
   },
 };
 
