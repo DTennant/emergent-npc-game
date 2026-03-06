@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS, TILE_SIZE, NPC_COLORS } from '../config';
 import { TextureKeys } from '../assets/keys';
+import { GameState } from '../world/GameState';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -29,11 +30,17 @@ export class BootScene extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 32,
     });
+
+    // Load RPG tileset for terrain backgrounds
+    this.load.image('rpg_tileset', 'assets/rpg-tileset.png');
   }
 
   create(): void {
+    GameState.init(this.game);
+
     this.generateTextures();
     this.upgradeToSpritesheetCharacters();
+    this.extractTilesetTextures();
 
     // Disabled: Kenney spritesheet frame indices need remapping
     // this.upgradeTextures();
@@ -818,6 +825,46 @@ export class BootScene extends Phaser.Scene {
     const g = Math.floor(((color >> 8) & 0xff) * factor);
     const b = Math.floor((color & 0xff) * factor);
     return (r << 16) | (g << 8) | b;
+  }
+
+  // --- Tileset extraction ---
+
+  private extractTilesetTextures(): void {
+    if (!this.textures.exists('rpg_tileset')) return;
+    const source = this.textures.get('rpg_tileset').getSourceImage() as HTMLImageElement;
+
+    // Village grass tiles (row 62, cols 67-68)
+    this.extractTile(source, 'tile_grass', 1072, 992, 16, 16);
+    this.extractTile(source, 'tile_grass2', 1088, 992, 16, 16);
+    this.extractTile(source, 'tile_grass3', 1072, 1008, 16, 16);
+    this.extractTile(source, 'tile_grass4', 1088, 1008, 16, 16);
+
+    // Path tile (row 83, col 2)
+    this.extractTile(source, 'tile_path', 32, 1328, 16, 16);
+
+    // Dark forest floor tiles (row 62, cols 65-66)
+    this.extractTile(source, 'tile_forest', 1040, 992, 16, 16);
+    this.extractTile(source, 'tile_forest2', 1056, 992, 16, 16);
+    this.extractTile(source, 'tile_forest3', 1040, 1008, 16, 16);
+    this.extractTile(source, 'tile_forest4', 1056, 1008, 16, 16);
+
+    // Tree tile for decoration (row 64, col 67)
+    this.extractTile(source, 'tile_tree', 1072, 1024, 16, 16);
+  }
+
+  private extractTile(source: HTMLImageElement, key: string, sx: number, sy: number, w: number, h: number): void {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(source, sx, sy, w, h, 0, 0, w, h);
+    const canvasTex = this.textures.createCanvas(key, w, h);
+    if (!canvasTex) return;
+    const destCtx = canvasTex.getContext();
+    destCtx.drawImage(canvas, 0, 0);
+    canvasTex.refresh();
+    const tex = this.textures.get(key);
+    if (tex) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
   }
 
   // --- Kenney spritesheet upgrade (disabled) ---
