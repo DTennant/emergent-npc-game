@@ -32,6 +32,10 @@ const config: Phaser.Types.Core.GameConfig = {
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
+    expandParent: true,
+    width: GAME_WIDTH,
+    height: GAME_HEIGHT,
+    min: { width: 640, height: 480 },
   },
   dom: {
     createContainer: true,
