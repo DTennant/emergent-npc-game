@@ -19,11 +19,13 @@ export class DialogueScene extends Phaser.Scene {
   private worldState!: WorldState;
   private storylineManager?: StorylineManager;
   private onClose!: () => void;
-  private dialogueText!: Phaser.GameObjects.Text;
+  private conversationContainer!: HTMLDivElement;
+  private conversationDom!: Phaser.GameObjects.DOMElement;
   private inputElement!: HTMLInputElement;
   private inputDom!: Phaser.GameObjects.DOMElement;
   private isWaiting = false;
   private conversationLog: { speaker: string; text: string }[] = [];
+  private styleElement?: HTMLStyleElement;
 
   constructor() {
     super({ key: 'DialogueScene' });
@@ -50,20 +52,21 @@ export class DialogueScene extends Phaser.Scene {
     backdrop.setDepth(50);
     backdrop.setInteractive();
 
-    const boxY = GAME_HEIGHT - 140;
+    const boxHeight = 280;
+    const boxY = GAME_HEIGHT - (boxHeight / 2) - 20;
     const box = this.add.rectangle(
       GAME_WIDTH / 2,
       boxY,
       GAME_WIDTH - 40,
-      200,
+      boxHeight,
       0x1a1a2e,
       0.95
     );
     box.setStrokeStyle(2, 0x4488ff);
     box.setDepth(51);
 
-    const header = this.add.text(40, boxY - 85, `💬 ${this.npc.persona.name} (${this.npc.persona.role})`, {
-      fontSize: '16px',
+    const header = this.add.text(40, boxY - (boxHeight / 2) + 20, `💬 ${this.npc.persona.name} (${this.npc.persona.role})`, {
+      fontSize: '18px',
       color: '#ffcc00',
       stroke: '#000000',
       strokeThickness: 2,
@@ -71,21 +74,14 @@ export class DialogueScene extends Phaser.Scene {
     });
     header.setDepth(52);
 
-    this.dialogueText = this.add.text(40, boxY - 55, '', {
-      fontSize: '14px',
-      color: '#ffffff',
-      wordWrap: { width: GAME_WIDTH - 80 },
-      lineSpacing: 4,
-      resolution: window.devicePixelRatio,
-    });
-    this.dialogueText.setDepth(52);
+    this.createConversationDisplay(boxY, boxHeight);
 
     const instructions = this.add.text(
       GAME_WIDTH / 2,
-      boxY + 80,
+      boxY + (boxHeight / 2) + 20,
       'Type your message and press Enter | Press Escape to leave',
       {
-        fontSize: '11px',
+        fontSize: '12px',
         color: '#888888',
         resolution: window.devicePixelRatio,
       }
@@ -93,7 +89,7 @@ export class DialogueScene extends Phaser.Scene {
     instructions.setOrigin(0.5);
     instructions.setDepth(52);
 
-    this.createInput(boxY);
+    this.createInput(boxY, boxHeight);
     this.showNPCGreeting();
 
     this.input.keyboard!.on('keydown-ESC', () => {
@@ -101,13 +97,43 @@ export class DialogueScene extends Phaser.Scene {
     });
   }
 
-  private createInput(boxY: number): void {
+  private createConversationDisplay(boxY: number, boxHeight: number): void {
+    this.conversationContainer = document.createElement('div');
+    this.conversationContainer.style.cssText = [
+      `width: ${GAME_WIDTH - 80}px`,
+      `height: ${boxHeight - 110}px`,
+      'overflow-y: auto',
+      'background: rgba(0, 0, 0, 0.3)',
+      'padding: 10px',
+      'border-radius: 4px',
+      'font-family: monospace',
+      'font-size: 14px',
+      'line-height: 1.5',
+      'color: #ffffff',
+    ].join('; ');
+
+    this.conversationContainer.className = 'dialogue-log';
+
+    this.styleElement = document.createElement('style');
+    this.styleElement.textContent = `
+      .dialogue-log::-webkit-scrollbar { width: 8px; }
+      .dialogue-log::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+      .dialogue-log::-webkit-scrollbar-thumb { background: #4488ff; border-radius: 4px; }
+      .dialogue-log::-webkit-scrollbar-thumb:hover { background: #66aaff; }
+    `;
+    document.head.appendChild(this.styleElement);
+
+    this.conversationDom = this.add.dom(GAME_WIDTH / 2, boxY - 10, this.conversationContainer);
+    this.conversationDom.setDepth(52);
+  }
+
+  private createInput(boxY: number, boxHeight: number): void {
     this.inputElement = document.createElement('input');
     this.inputElement.type = 'text';
     this.inputElement.placeholder = 'Say something...';
     this.inputElement.style.cssText = [
-      `width: ${GAME_WIDTH - 100}px`,
-      'padding: 8px 12px',
+      `width: ${GAME_WIDTH - 80}px`,
+      'padding: 10px 12px',
       'font-size: 14px',
       'background: #2a2a4e',
       'color: #ffffff',
@@ -130,7 +156,7 @@ export class DialogueScene extends Phaser.Scene {
       e.stopPropagation();
     });
 
-    this.inputDom = this.add.dom(GAME_WIDTH / 2, boxY + 50, this.inputElement);
+    this.inputDom = this.add.dom(GAME_WIDTH / 2, boxY + (boxHeight / 2) - 30, this.inputElement);
     this.inputDom.setDepth(53);
     setTimeout(() => this.inputElement.focus(), 100);
   }
@@ -154,8 +180,6 @@ export class DialogueScene extends Phaser.Scene {
     this.conversationLog.push({ speaker: 'You', text: message });
     this.updateDialogueDisplay();
 
-    this.dialogueText.setText(this.formatLog() + `\n${this.npc.persona.name}: ...`);
-
     const response = await this.npc.generateResponse(
       this.llmClient,
       message,
@@ -169,25 +193,50 @@ export class DialogueScene extends Phaser.Scene {
   }
 
   private updateDialogueDisplay(): void {
-    this.dialogueText.setText(this.formatLog());
-  }
+    if (!this.conversationContainer) return;
 
-  private formatLog(): string {
-    const recent = this.conversationLog.slice(-4);
-    return recent.map((entry) => `${entry.speaker}: ${entry.text}`).join('\n\n');
+    const messagesHtml = this.conversationLog
+      .map((entry) => {
+        const isPlayer = entry.speaker === 'You';
+        const color = isPlayer ? '#4488ff' : '#ffcc00';
+        // Escape HTML to prevent injection
+        const safeText = entry.text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        
+        return `<div style="margin-bottom: 8px;">
+          <strong style="color: ${color}">${entry.speaker}:</strong> 
+          <span style="color: #eeeeee">${safeText}</span>
+        </div>`;
+      })
+      .join('');
+
+    this.conversationContainer.innerHTML = messagesHtml;
+    
+    // Auto-scroll to bottom
+    this.conversationContainer.scrollTop = this.conversationContainer.scrollHeight;
   }
 
   private closeDialogue(): void {
-    if (this.inputDom) {
-      this.inputDom.destroy();
-    }
+    this.cleanup();
     this.onClose();
     this.scene.stop();
   }
 
   shutdown(): void {
+    this.cleanup();
+  }
+
+  private cleanup(): void {
     if (this.inputDom) {
       this.inputDom.destroy();
+    }
+    if (this.conversationDom) {
+      this.conversationDom.destroy();
+    }
+    if (this.styleElement?.parentNode) {
+      this.styleElement.parentNode.removeChild(this.styleElement);
     }
   }
 }

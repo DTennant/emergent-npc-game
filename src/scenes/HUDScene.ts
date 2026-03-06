@@ -31,32 +31,32 @@ export class HUDScene extends Phaser.Scene {
 
   create(): void {
     // HUD background strip
-    this.add.rectangle(GAME_WIDTH / 2, 12, GAME_WIDTH, 24, 0x000000, 0.6).setDepth(100);
+    this.add.rectangle(GAME_WIDTH / 2, 16, GAME_WIDTH, 32, 0x000000, 0.6).setDepth(100);
 
     // Time display
-    this.timeText = this.add.text(10, 4, '06:00', {
-      fontSize: '14px',
+    this.timeText = this.add.text(10, 8, '06:00', {
+      fontSize: '16px',
       color: '#ffcc00',
       stroke: '#000000',
-      strokeThickness: 2,
+      strokeThickness: 3,
       resolution: window.devicePixelRatio,
     });
     this.timeText.setDepth(101);
 
     // Day display
-    this.dayText = this.add.text(80, 4, 'Day 1', {
-      fontSize: '14px',
+    this.dayText = this.add.text(90, 8, 'Day 1', {
+      fontSize: '16px',
       color: '#ffffff',
       stroke: '#000000',
-      strokeThickness: 2,
+      strokeThickness: 3,
       resolution: window.devicePixelRatio,
     });
     this.dayText.setDepth(101);
 
     // API status
     const hasApi = this.llmClient.hasApiKey();
-    this.apiStatus = this.add.text(GAME_WIDTH - 10, 4, hasApi ? '🟢 LLM' : '🟡 Fallback', {
-      fontSize: '11px',
+    this.apiStatus = this.add.text(GAME_WIDTH - 50, 8, hasApi ? '🟢 LLM' : '🟡 Fallback', {
+      fontSize: '12px',
       color: hasApi ? '#44ff44' : '#ffaa00',
       stroke: '#000000',
       strokeThickness: 2,
@@ -66,18 +66,18 @@ export class HUDScene extends Phaser.Scene {
     this.apiStatus.setDepth(101);
 
     this.add
-      .text(GAME_WIDTH / 2, 4, 'WASD: Move | E: Talk | I: Inventory | ESC: Close', {
-        fontSize: '10px',
-        color: '#888888',
+      .text(GAME_WIDTH / 2, 8, 'WASD: Move | E: Talk | I: Inventory | ESC: Close', {
+        fontSize: '12px',
+        color: '#cccccc',
         stroke: '#000000',
-        strokeThickness: 1,
+        strokeThickness: 2,
         resolution: window.devicePixelRatio,
       })
       .setOrigin(0.5, 0)
       .setDepth(101);
 
-    this.equippedWeaponText = this.add.text(10, GAME_HEIGHT - 24, 'Weapon: (none)', {
-      fontSize: '11px',
+    this.equippedWeaponText = this.add.text(10, GAME_HEIGHT - 30, 'Weapon: (none)', {
+      fontSize: '14px',
       color: '#aaaaaa',
       stroke: '#000000',
       strokeThickness: 2,
@@ -98,8 +98,8 @@ export class HUDScene extends Phaser.Scene {
     this.notificationText.setDepth(101);
     this.notificationText.setVisible(false);
 
-    const settingsBtn = this.add.text(GAME_WIDTH - 80, 4, '⚙️', {
-      fontSize: '16px',
+    const settingsBtn = this.add.text(GAME_WIDTH - 30, 6, '⚙️', {
+      fontSize: '20px',
       resolution: window.devicePixelRatio,
     });
     settingsBtn.setDepth(101);
@@ -109,6 +109,8 @@ export class HUDScene extends Phaser.Scene {
         this.scene.launch('SettingsScene', { onClose: () => {} });
       }
     });
+    settingsBtn.on('pointerover', () => settingsBtn.setScale(1.1));
+    settingsBtn.on('pointerout', () => settingsBtn.setScale(1));
 
     EventBus.on(Events.SHOW_NOTIFICATION, (data: { text: string }) => {
       this.showNotification(data.text);

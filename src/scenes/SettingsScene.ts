@@ -3,14 +3,15 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { EventBus, Events } from '../world/EventBus';
 
 const INPUT_STYLE = [
-  'width: 340px',
-  'padding: 8px',
-  'font-size: 14px',
+  'width: 380px',
+  'padding: 10px',
+  'font-size: 16px',
   'background: #2a2a4e',
   'color: #ffffff',
   'border: 1px solid #4488ff',
   'border-radius: 4px',
   'outline: none',
+  'transition: border-color 0.2s',
 ].join('; ');
 
 export class SettingsScene extends Phaser.Scene {
@@ -48,23 +49,23 @@ export class SettingsScene extends Phaser.Scene {
     panel.setDepth(51);
 
     const title = this.add.text(panelX, panelY - 170, '⚙️ LLM Settings', {
-      fontSize: '24px',
+      fontSize: '28px',
       color: '#ffcc00',
       stroke: '#000000',
-      strokeThickness: 2,
+      strokeThickness: 3,
       resolution: window.devicePixelRatio,
     });
     title.setOrigin(0.5);
     title.setDepth(52);
 
     const labelStyle: Phaser.Types.GameObjects.Text.TextStyle = {
-      fontSize: '14px',
-      color: '#ffffff',
+      fontSize: '16px',
+      color: '#aaccff',
       resolution: window.devicePixelRatio,
     };
-    this.add.text(panelX - 220, panelY - 130, 'API Key:', labelStyle).setDepth(52);
-    this.add.text(panelX - 220, panelY - 55, 'Base URL:', labelStyle).setDepth(52);
-    this.add.text(panelX - 220, panelY + 20, 'Model:', labelStyle).setDepth(52);
+    this.add.text(panelX - 240, panelY - 130, 'API Key:', labelStyle).setDepth(52);
+    this.add.text(panelX - 240, panelY - 55, 'Base URL:', labelStyle).setDepth(52);
+    this.add.text(panelX - 240, panelY + 20, 'Model:', labelStyle).setDepth(52);
 
     this.createInputs(panelX, panelY);
     this.createButtons(panelX, panelY);
@@ -79,19 +80,22 @@ export class SettingsScene extends Phaser.Scene {
     this.apiInput.value = localStorage.getItem('openai_api_key') || '';
     this.apiInput.style.cssText = INPUT_STYLE;
 
-    const apiDom = this.add.dom(centerX + 10, centerY - 108, this.apiInput);
+    const apiDom = this.add.dom(centerX + 30, centerY - 108, this.apiInput);
     apiDom.setDepth(53);
     this.domElements.push(apiDom);
 
-    const toggleBtn = this.add.text(centerX + 200, centerY - 120, '👁️', {
-      fontSize: '14px',
+    const toggleBtn = this.add.text(centerX + 235, centerY - 108, '👁️', {
+      fontSize: '18px',
       resolution: window.devicePixelRatio,
     });
+    toggleBtn.setOrigin(0.5);
     toggleBtn.setDepth(53);
     toggleBtn.setInteractive({ useHandCursor: true });
     toggleBtn.on('pointerdown', () => {
       this.apiInput.type = this.apiInput.type === 'password' ? 'text' : 'password';
     });
+    toggleBtn.on('pointerover', () => toggleBtn.setScale(1.1));
+    toggleBtn.on('pointerout', () => toggleBtn.setScale(1));
 
     this.baseUrlInput = document.createElement('input');
     this.baseUrlInput.type = 'text';
@@ -99,7 +103,7 @@ export class SettingsScene extends Phaser.Scene {
     this.baseUrlInput.value = localStorage.getItem('llm_base_url') || '';
     this.baseUrlInput.style.cssText = INPUT_STYLE;
 
-    const baseUrlDom = this.add.dom(centerX + 10, centerY - 33, this.baseUrlInput);
+    const baseUrlDom = this.add.dom(centerX + 30, centerY - 33, this.baseUrlInput);
     baseUrlDom.setDepth(53);
     this.domElements.push(baseUrlDom);
 
@@ -109,7 +113,7 @@ export class SettingsScene extends Phaser.Scene {
     this.modelInput.value = localStorage.getItem('llm_model') || 'gpt-4o-mini';
     this.modelInput.style.cssText = INPUT_STYLE;
 
-    const modelDom = this.add.dom(centerX + 10, centerY + 42, this.modelInput);
+    const modelDom = this.add.dom(centerX + 30, centerY + 42, this.modelInput);
     modelDom.setDepth(53);
     this.domElements.push(modelDom);
 
@@ -117,12 +121,12 @@ export class SettingsScene extends Phaser.Scene {
   }
 
   private createButtons(centerX: number, centerY: number): void {
-    const saveBtn = this.add.rectangle(centerX - 60, centerY + 140, 100, 40, 0x44aa44);
+    const saveBtn = this.add.rectangle(centerX - 80, centerY + 140, 120, 48, 0x44aa44);
     saveBtn.setDepth(52);
     saveBtn.setInteractive({ useHandCursor: true });
 
-    const saveText = this.add.text(centerX - 60, centerY + 140, 'Save', {
-      fontSize: '18px',
+    const saveText = this.add.text(centerX - 80, centerY + 140, 'Save', {
+      fontSize: '20px',
       color: '#ffffff',
       resolution: window.devicePixelRatio,
     });
@@ -132,16 +136,18 @@ export class SettingsScene extends Phaser.Scene {
     saveBtn.on('pointerdown', () => {
       this.saveSettings();
     });
+    saveBtn.on('pointerover', () => saveBtn.setFillStyle(0x55cc55));
+    saveBtn.on('pointerout', () => saveBtn.setFillStyle(0x44aa44));
 
-    const cancelBtn = this.add.rectangle(centerX + 60, centerY + 140, 100, 40, 0xaa4444);
+    const cancelBtn = this.add.rectangle(centerX + 80, centerY + 140, 120, 48, 0xaa4444);
     cancelBtn.setDepth(52);
     cancelBtn.setInteractive({ useHandCursor: true });
 
     const isFirstRun = !localStorage.getItem('openai_api_key') && !this.onClose;
     const cancelLabel = isFirstRun ? 'Skip' : 'Cancel';
 
-    const cancelText = this.add.text(centerX + 60, centerY + 140, cancelLabel, {
-      fontSize: '18px',
+    const cancelText = this.add.text(centerX + 80, centerY + 140, cancelLabel, {
+      fontSize: '20px',
       color: '#ffffff',
       resolution: window.devicePixelRatio,
     });
@@ -151,6 +157,8 @@ export class SettingsScene extends Phaser.Scene {
     cancelBtn.on('pointerdown', () => {
       this.closeSettings();
     });
+    cancelBtn.on('pointerover', () => cancelBtn.setFillStyle(0xcc5555));
+    cancelBtn.on('pointerout', () => cancelBtn.setFillStyle(0xaa4444));
   }
 
   private saveSettings(): void {

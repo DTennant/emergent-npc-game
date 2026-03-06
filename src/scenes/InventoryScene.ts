@@ -9,10 +9,10 @@ interface InventorySceneData {
 
 const GRID_COLS = 5;
 const GRID_ROWS = 4;
-const CELL_SIZE = 56;
-const CELL_GAP = 6;
-const GRID_X = 40;
-const GRID_Y = 80;
+const CELL_SIZE = 64;
+const CELL_GAP = 8;
+const GRID_X = 50;
+const GRID_Y = 90;
 
 const TYPE_COLORS: Record<string, number> = {
   weapon: 0xcc4444,
@@ -69,7 +69,7 @@ export class InventoryScene extends Phaser.Scene {
     panel.setDepth(51);
 
     this.add.text(GAME_WIDTH / 2, 50, 'Inventory', {
-      fontSize: '20px',
+      fontSize: '24px',
       color: '#ffcc00',
       stroke: '#000000',
       strokeThickness: 2,
@@ -105,8 +105,8 @@ export class InventoryScene extends Phaser.Scene {
 
         this.itemCells.push(cell);
 
-        const nameText = this.add.text(x, y - 6, '', {
-          fontSize: '9px',
+        const nameText = this.add.text(x, y - 8, '', {
+          fontSize: '11px',
           color: '#ffffff',
           align: 'center',
           wordWrap: { width: CELL_SIZE - 4 },
@@ -115,7 +115,7 @@ export class InventoryScene extends Phaser.Scene {
         this.itemTexts.push(nameText);
 
         const qtyText = this.add.text(x + CELL_SIZE / 2 - 4, y + CELL_SIZE / 2 - 4, '', {
-          fontSize: '10px',
+          fontSize: '12px',
           color: '#aaffaa',
           stroke: '#000000',
           strokeThickness: 2,
@@ -137,7 +137,7 @@ export class InventoryScene extends Phaser.Scene {
     const panelY = GRID_Y;
 
     this.add.text(panelX, panelY, 'Equipped', {
-      fontSize: '14px',
+      fontSize: '18px',
       color: '#ffcc00',
       stroke: '#000000',
       strokeThickness: 2,
@@ -148,15 +148,15 @@ export class InventoryScene extends Phaser.Scene {
     const labels = ['Weapon', 'Lantern', 'Accessory'];
 
     for (let i = 0; i < slots.length; i++) {
-      const slotY = panelY + 30 + i * 50;
+      const slotY = panelY + 40 + i * 60;
       this.add.text(panelX, slotY, `${labels[i]}:`, {
-        fontSize: '11px',
+        fontSize: '14px',
         color: '#888888',
         resolution: window.devicePixelRatio,
       }).setDepth(52);
 
-      const valueText = this.add.text(panelX, slotY + 16, '(empty)', {
-        fontSize: '12px',
+      const valueText = this.add.text(panelX, slotY + 20, '(empty)', {
+        fontSize: '14px',
         color: '#666666',
         resolution: window.devicePixelRatio,
       }).setDepth(52);
@@ -165,21 +165,21 @@ export class InventoryScene extends Phaser.Scene {
   }
 
   private createDescriptionPanel(): void {
-    const descY = GRID_Y + GRID_ROWS * (CELL_SIZE + CELL_GAP) + 20;
+    const descY = GRID_Y + GRID_ROWS * (CELL_SIZE + CELL_GAP) + 30;
 
     this.descriptionText = this.add.text(GRID_X, descY, 'Select an item to see details.', {
-      fontSize: '12px',
+      fontSize: '14px',
       color: '#aaaaaa',
       wordWrap: { width: GAME_WIDTH - 120 },
-      lineSpacing: 4,
+      lineSpacing: 6,
       resolution: window.devicePixelRatio,
     }).setDepth(52);
 
-    this.equipButton = this.add.text(GAME_WIDTH - 120, descY, '', {
-      fontSize: '13px',
+    this.equipButton = this.add.text(GAME_WIDTH - 140, descY, '', {
+      fontSize: '16px',
       color: '#000000',
       backgroundColor: '#44cc44',
-      padding: { x: 10, y: 6 },
+      padding: { x: 12, y: 8 },
       resolution: window.devicePixelRatio,
     }).setDepth(53).setInteractive().setVisible(false);
 
