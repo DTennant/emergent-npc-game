@@ -48,6 +48,7 @@ export class BootScene extends Phaser.Scene {
     // Disabled: Kenney spritesheet frame indices need remapping
     // this.upgradeTextures();
 
+    this.scene.launch('DebugOverlayScene');
     this.scene.start('WorldScene');
   }
 

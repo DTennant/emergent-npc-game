@@ -11,6 +11,8 @@ import { DungeonScene } from './scenes/DungeonScene';
 import { WoodsScene } from './scenes/WoodsScene';
 import { SettingsScene } from './scenes/SettingsScene';
 import { BuildingInteriorScene } from './scenes/BuildingInteriorScene';
+import { DebugOverlayScene } from './scenes/DebugOverlayScene';
+import { DebugManager } from './debug/DebugManager';
 import { GAME_WIDTH, GAME_HEIGHT } from './config';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -42,10 +44,11 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true,
   },
-  scene: [LoginScene, BootScene, WorldScene, WoodsScene, DialogueScene, HUDScene, InventoryScene, CraftingScene, TradeScene, DungeonScene, SettingsScene, BuildingInteriorScene],
+  scene: [LoginScene, BootScene, WorldScene, WoodsScene, DialogueScene, HUDScene, InventoryScene, CraftingScene, TradeScene, DungeonScene, SettingsScene, BuildingInteriorScene, DebugOverlayScene],
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+new DebugManager(game);
 
 console.log('🌍 Emergent NPC World — Thornwick Village');
 console.log('WASD to move, E to interact with NPCs');
