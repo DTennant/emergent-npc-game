@@ -63,6 +63,7 @@ export class WoodsScene extends Phaser.Scene {
   private inInventory = false;
   private spawnX = 60;
   private spawnY = GAME_HEIGHT / 2;
+  private blightParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
 
   constructor() {
     super({ key: 'WoodsScene' });
@@ -85,6 +86,27 @@ export class WoodsScene extends Phaser.Scene {
     this.createForestWorld();
 
     this.blightSystem = new BlightSystem(this);
+
+    // Create blight ambient particle emitter (always active in woods, scaled by intensity)
+    if (this.textures.exists('particle_circle')) {
+      this.blightParticles = this.add.particles(0, 0, 'particle_circle', {
+        emitting: false,
+        lifespan: { min: 2000, max: 4000 },
+        frequency: 200,
+        quantity: 1,
+        speed: { min: 10, max: 30 },
+        angle: { min: 250, max: 290 },
+        scale: { start: 0.4, end: 1.2 },
+        alpha: { start: 0.6, end: 0 },
+        tint: [0x8800ff, 0x6600cc, 0x440088],
+        blendMode: Phaser.BlendModes.ADD,
+        emitZone: {
+          type: 'random',
+          source: new Phaser.Geom.Rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT),
+        } as Phaser.Types.GameObjects.Particles.EmitZoneData,
+      });
+      this.blightParticles.setDepth(20);
+    }
 
     this.player = this.physics.add.sprite(this.spawnX, this.spawnY, TextureKeys.PLAYER);
     this.player.setDepth(10);
@@ -168,6 +190,15 @@ export class WoodsScene extends Phaser.Scene {
       }
     });
 
+    this.input.keyboard!.addKey('J').on('down', () => {
+      if (this.transitioning) return;
+      if (this.scene.isActive('QuestJournalScene')) {
+        this.scene.stop('QuestJournalScene');
+      } else {
+        this.scene.launch('QuestJournalScene');
+      }
+    });
+
     this.spaceKey.on('down', () => {
       if (this.transitioning) return;
       this.handlePlayerAttack();
@@ -182,6 +213,14 @@ export class WoodsScene extends Phaser.Scene {
 
     const gs = GameState.get(this);
     gs.worldState.update(delta);
+    gs.playerPosition = { x: this.player.x, y: this.player.y };
+
+    if (this.blightParticles) {
+      const intensity = Math.max(0.3, this.blightSystem?.getIntensity() ?? 0);
+      this.blightParticles.emitting = true;
+      this.blightParticles.frequency = Math.max(30, 400 - intensity * 350);
+      this.blightParticles.quantity = Math.ceil(intensity * 4);
+    }
 
     this.handlePlayerMovement();
 
@@ -223,6 +262,7 @@ export class WoodsScene extends Phaser.Scene {
   }
 
   private onItemAcquired(data: { itemId: string }): void {
+    this.cameras.main.flash(200, 255, 255, 255, false);
     const gs = GameState.get(this);
     const runestoneMap: Record<string, string> = {
       runestone_forest: 'forest_cave',
@@ -335,6 +375,9 @@ export class WoodsScene extends Phaser.Scene {
   }
 
   private handlePlayerMovement(): void {
+    this.combatSystem.update(this.game.loop.delta);
+    if (this.combatSystem.isKnockedBack()) return;
+
     let dx = 0;
     let dy = 0;
 
@@ -435,7 +478,7 @@ export class WoodsScene extends Phaser.Scene {
     this.cleanupEvents();
     this.scene.stop('HUDScene');
     this.cameras.main.fadeOut(400);
-    this.time.delayedCall(400, () => {
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       this.scene.start('DungeonScene', {
         dungeonId,
         inventory: gs.inventory,
@@ -537,7 +580,7 @@ export class WoodsScene extends Phaser.Scene {
         this.cleanupEvents();
         this.scene.stop('HUDScene');
         this.cameras.main.fadeOut(400);
-        this.time.delayedCall(400, () => {
+        this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
           this.scene.start('WorldScene', {
             spawnX: GAME_WIDTH - 60,
             spawnY: this.player.y,
@@ -676,9 +719,8 @@ export class WoodsScene extends Phaser.Scene {
       const dist = Math.sqrt(dx * dx + dy * dy);
 
       if (dist <= TILE_SIZE) {
-        const config = enemy.getConfig();
         const gs2 = GameState.get(this);
-        this.combatSystem.handlePlayerDamage(config.damage, {
+        this.combatSystem.handlePlayerDamage(enemy.getEffectiveDamage(), {
           x: enemy.sprite.x,
           y: enemy.sprite.y,
         }, gs2.inventory);
@@ -694,7 +736,7 @@ export class WoodsScene extends Phaser.Scene {
     EventBus.emit(Events.SHOW_NOTIFICATION, 'You have fallen... Returning to village.');
 
     this.cameras.main.fadeOut(400);
-    this.time.delayedCall(400, () => {
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       this.scene.start('WorldScene', {
         spawnX: GAME_WIDTH / 2,
         spawnY: GAME_HEIGHT / 2,

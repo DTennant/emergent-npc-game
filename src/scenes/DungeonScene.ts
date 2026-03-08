@@ -7,6 +7,7 @@ import { HealthBar } from '../combat/HealthBar';
 import { Inventory } from '../inventory/Inventory';
 import { TextureKeys } from '../assets/keys';
 import { EventBus, Events } from '../world/EventBus';
+import { GameState } from '../world/GameState';
 import {
   GAME_WIDTH,
   GAME_HEIGHT,
@@ -174,9 +175,16 @@ export class DungeonScene extends Phaser.Scene {
     EventBus.on(Events.ENTITY_DIED, this.entityDiedHandler);
 
     this.loadRoom(0);
+
+    const gs = GameState.get(this);
+    gs.currentZone = 'dungeon';
+    gs.storylineManager.discoverDungeon(this.dungeonDef.id);
   }
 
   update(_time: number, delta: number): void {
+    const gs = GameState.get(this);
+    gs.playerPosition = { x: this.player.x, y: this.player.y };
+
     this.handlePlayerMovement();
 
     for (const enemy of this.enemies) {
@@ -364,6 +372,9 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private handlePlayerMovement(): void {
+    this.combatSystem.update(this.game.loop.delta);
+    if (this.combatSystem.isKnockedBack()) return;
+
     let dx = 0;
     let dy = 0;
 
@@ -407,6 +418,7 @@ export class DungeonScene extends Phaser.Scene {
           const damage = this.combatSystem.getAttackDamage(this.inventory);
           if (damage > 0) {
             target.takeDamage(damage);
+            this.showDamageNumber(target.sprite.x, target.sprite.y - 20, damage);
           }
         },
         undefined,
@@ -418,6 +430,28 @@ export class DungeonScene extends Phaser.Scene {
       for (const c of colliders) {
         this.physics.world.removeCollider(c);
       }
+    });
+  }
+
+  private showDamageNumber(x: number, y: number, damage: number): void {
+    const dmgText = this.add.text(x, y, `-${damage}`, {
+      fontSize: fs(34),
+      color: '#ff4444',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 3,
+      resolution: window.devicePixelRatio,
+    });
+    dmgText.setOrigin(0.5);
+    dmgText.setDepth(100);
+
+    this.tweens.add({
+      targets: dmgText,
+      y: y - 40,
+      alpha: 0,
+      duration: 800,
+      ease: 'Power2',
+      onComplete: () => dmgText.destroy(),
     });
   }
 
@@ -436,8 +470,8 @@ export class DungeonScene extends Phaser.Scene {
       const dist = Math.sqrt(dx * dx + dy * dy);
 
       if (dist <= TILE_SIZE) {
-        const config = target.getConfig();
-        this.combatSystem.handlePlayerDamage(config.damage, {
+        const damage = target.getEffectiveDamage();
+        this.combatSystem.handlePlayerDamage(damage, {
           x: target.sprite.x,
           y: target.sprite.y,
         }, this.inventory);
@@ -449,6 +483,9 @@ export class DungeonScene extends Phaser.Scene {
     EventBus.emit(Events.SHOW_NOTIFICATION, {
       message: `Runestone acquired! ${this.dungeonDef.name} cleared!`,
     });
+
+    const gs = GameState.get(this);
+    gs.storylineManager.clearDungeon(this.dungeonDef.id);
 
     this.time.delayedCall(3000, () => {
       this.exitDungeon();
