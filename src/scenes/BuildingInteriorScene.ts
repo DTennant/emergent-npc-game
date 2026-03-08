@@ -516,6 +516,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
     EventBus.off(Events.DIALOGUE_END, this.onDialogueEnd, this);
     if (this.npc) {
       this.npc.destroy();
+      this.npc = null;
     }
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
