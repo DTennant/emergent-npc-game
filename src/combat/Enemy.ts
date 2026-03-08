@@ -37,6 +37,9 @@ export class Enemy {
   private healthBar: HealthBar;
   private ai: EnemyAI;
   private dead = false;
+  private deathTween: Phaser.Tweens.Tween | null = null;
+  private speedMultiplier = 1.0;
+  private damageMultiplier = 1.0;
 
   constructor(
     scene: Phaser.Scene,
@@ -64,6 +67,12 @@ export class Enemy {
     );
 
     this.ai = new EnemyAI(x, y);
+
+    this.scene.events.once('shutdown', () => {
+      if (this.dead) {
+        this.cleanup();
+      }
+    });
   }
 
   update(delta: number, playerX: number, playerY: number): void {
@@ -82,7 +91,7 @@ export class Enemy {
       playerY,
       this.config.aggroRange,
       this.config.attackCooldown,
-      this.config.speed
+      this.config.speed * this.speedMultiplier
     );
 
     this.sprite.setVelocity(vel.vx, vel.vy);
@@ -101,6 +110,23 @@ export class Enemy {
     this.currentHealth = Math.max(0, this.currentHealth - amount);
     this.healthBar.setHealth(this.currentHealth);
 
+    // Add hit spark particles
+    if (this.scene.textures.exists('particle_spark')) {
+      const emitter = this.scene.add.particles(this.sprite.x, this.sprite.y, 'particle_spark', {
+        emitting: false,
+        lifespan: { min: 150, max: 350 },
+        speed: { min: 80, max: 200 },
+        angle: { min: 0, max: 360 },
+        scale: { start: 1, end: 0 },
+        alpha: { start: 1, end: 0 },
+        tint: [0xffdd00, 0xff8800, 0xffffff],
+        blendMode: Phaser.BlendModes.ADD,
+      });
+      emitter.setDepth(20);
+      emitter.explode(8, this.sprite.x, this.sprite.y);
+      this.scene.time.delayedCall(400, () => emitter.destroy());
+    }
+
     this.sprite.setTint(0xffffff);
     this.scene.time.delayedCall(100, () => {
       if (!this.dead) {
@@ -118,6 +144,18 @@ export class Enemy {
     if (this.currentHealth <= 0) {
       this.die();
     }
+  }
+
+  setSpeedMultiplier(mult: number): void {
+    this.speedMultiplier = mult;
+  }
+
+  setDamageMultiplier(mult: number): void {
+    this.damageMultiplier = mult;
+  }
+
+  getEffectiveDamage(): number {
+    return Math.round(this.config.damage * this.damageMultiplier);
   }
 
   getDrops(): { itemId: string; quantity: number }[] {
@@ -143,18 +181,35 @@ export class Enemy {
     this.ai.die();
     this.sprite.setVelocity(0, 0);
 
+    if (this.scene.textures.exists('particle_spark')) {
+      const emitter = this.scene.add.particles(this.sprite.x, this.sprite.y, 'particle_spark', {
+        emitting: false,
+        lifespan: { min: 300, max: 600 },
+        speed: { min: 50, max: 150 },
+        angle: { min: 0, max: 360 },
+        scale: { start: 1.5, end: 0 },
+        alpha: { start: 1, end: 0 },
+        tint: [0xff4400, 0xff0000, 0xffaa00],
+        blendMode: Phaser.BlendModes.ADD,
+      });
+      emitter.setDepth(20);
+      emitter.explode(15, this.sprite.x, this.sprite.y);
+      this.scene.time.delayedCall(700, () => emitter.destroy());
+    }
+
     EventBus.emit(Events.ENTITY_DIED, {
       entity: this.config.name,
       drops: this.getDrops(),
     });
 
-    this.scene.tweens.add({
+    this.deathTween = this.scene.tweens.add({
       targets: this.sprite,
       alpha: 0,
       scaleX: 0.5,
       scaleY: 0.5,
       duration: 500,
       onComplete: () => {
+        this.deathTween = null;
         this.cleanup();
       },
     });
@@ -163,6 +218,10 @@ export class Enemy {
   }
 
   private cleanup(): void {
+    if (this.deathTween) {
+      this.deathTween.stop();
+      this.deathTween = null;
+    }
     if (this.sprite && this.sprite.active) {
       this.sprite.destroy();
     }

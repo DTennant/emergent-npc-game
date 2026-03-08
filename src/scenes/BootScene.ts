@@ -99,6 +99,9 @@ export class BootScene extends Phaser.Scene {
     this.generateItemTextures();
     this.generateEffectTextures();
 
+    // --- Particle Textures ---
+    this.createParticleTextures();
+
     // --- Boss Textures ---
     this.generateBossTextures();
 
@@ -641,6 +644,29 @@ export class BootScene extends Phaser.Scene {
 
     gfx.generateTexture(TextureKeys.EFFECT_BLIGHT, s, s);
     gfx.destroy();
+  }
+
+  private createParticleTextures(): void {
+    // 4x4 white square for sparks
+    const sq = this.make.graphics({ x: 0, y: 0 });
+    sq.fillStyle(0xffffff, 1);
+    sq.fillRect(0, 0, 4, 4);
+    sq.generateTexture(TextureKeys.PARTICLE_SPARK, 4, 4);
+    sq.destroy();
+
+    // 6px circle for ambient effects  
+    const circ = this.make.graphics({ x: 0, y: 0 });
+    circ.fillStyle(0xffffff, 1);
+    circ.fillCircle(3, 3, 3);
+    circ.generateTexture(TextureKeys.PARTICLE_CIRCLE, 6, 6);
+    circ.destroy();
+
+    // 2px dot for fine particles
+    const dot = this.make.graphics({ x: 0, y: 0 });
+    dot.fillStyle(0xffffff, 1);
+    dot.fillCircle(1, 1, 1);
+    dot.generateTexture(TextureKeys.PARTICLE_DOT, 2, 2);
+    dot.destroy();
   }
 
   // --- Boss textures ---

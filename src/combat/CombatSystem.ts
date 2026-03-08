@@ -23,6 +23,7 @@ export class CombatSystem {
   private inIFrames = false;
   private currentHealth: number;
   private maxHealth: number;
+  private knockbackTimer = 0;
 
   constructor(scene: Phaser.Scene, player: Phaser.Physics.Arcade.Sprite) {
     this.scene = scene;
@@ -102,6 +103,7 @@ export class CombatSystem {
     this.inIFrames = true;
 
     this.player.setTint(0xff0000);
+    this.scene.cameras.main.shake(120, 0.006);
 
     const dx = this.player.x - knockbackFrom.x;
     const dy = this.player.y - knockbackFrom.y;
@@ -111,6 +113,7 @@ export class CombatSystem {
       (dx / dist) * knockbackForce,
       (dy / dist) * knockbackForce
     );
+    this.knockbackTimer = 200;
 
     EventBus.emit(Events.ENTITY_DAMAGED, {
       entity: 'player',
@@ -127,6 +130,16 @@ export class CombatSystem {
     if (this.currentHealth <= 0) {
       EventBus.emit(Events.PLAYER_DIED);
     }
+  }
+
+  update(delta: number): void {
+    if (this.knockbackTimer > 0) {
+      this.knockbackTimer -= delta;
+    }
+  }
+
+  isKnockedBack(): boolean {
+    return this.knockbackTimer > 0;
   }
 
   getHealth(): number {

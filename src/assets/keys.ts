@@ -20,6 +20,9 @@ export const TextureKeys = {
   BOSS_BLIGHT_WRAITH: 'boss_blight_wraith',
   ITEM_SWORD: 'item_sword',
   EFFECT_BLIGHT: 'effect_blight',
+  PARTICLE_SPARK: 'particle_spark',
+  PARTICLE_CIRCLE: 'particle_circle',
+  PARTICLE_DOT: 'particle_dot',
 } as const;
 
 export const NPC_TEXTURE_MAP: Record<string, string> = {

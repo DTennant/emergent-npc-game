@@ -5,10 +5,18 @@ import { EventBus, Events } from '../world/EventBus';
 import { TILE_SIZE, GAME_WIDTH } from '../config';
 import { TextureKeys } from '../assets/keys';
 
+export interface BossPhaseConfig {
+  threshold: number; // health ratio to trigger (0 to 1)
+  speedMult: number;
+  damageMult: number;
+  tint: number;
+}
+
 export interface BossConfig extends EnemyConfig {
   bossName: string;
   runestoneId: string;
   phases?: number;
+  phaseConfigs?: BossPhaseConfig[];
 }
 
 export const BOSS_CONFIGS: Record<string, BossConfig> = {
@@ -27,6 +35,9 @@ export const BOSS_CONFIGS: Record<string, BossConfig> = {
       { itemId: 'gold', quantity: 20, chance: 1 },
       { itemId: 'enchantment_dust', quantity: 1, chance: 0.5 },
     ],
+    phaseConfigs: [
+      { threshold: 0.5, speedMult: 1.6, damageMult: 1.2, tint: 0xff6644 },
+    ],
   },
   boss_crystal_golem: {
     bossName: 'Crystal Golem',
@@ -43,6 +54,9 @@ export const BOSS_CONFIGS: Record<string, BossConfig> = {
       { itemId: 'gold', quantity: 30, chance: 1 },
       { itemId: 'enchantment_dust', quantity: 2, chance: 0.5 },
       { itemId: 'stone', quantity: 5, chance: 0.8 },
+    ],
+    phaseConfigs: [
+      { threshold: 0.5, speedMult: 1.2, damageMult: 1.5, tint: 0x4444ff },
     ],
   },
   boss_blight_wraith: {
@@ -61,6 +75,9 @@ export const BOSS_CONFIGS: Record<string, BossConfig> = {
       { itemId: 'moonpetal', quantity: 2, chance: 0.7 },
       { itemId: 'glass_vial', quantity: 2, chance: 0.6 },
     ],
+    phaseConfigs: [
+      { threshold: 0.5, speedMult: 1.4, damageMult: 1.4, tint: 0xcc00ff },
+    ],
   },
 };
 
@@ -74,15 +91,18 @@ export class BossEnemy {
   private enemy: Enemy;
   private scene: Phaser.Scene;
   private config: BossConfig;
-  private bossHealthBar: HealthBar;
-  private bossNameText: Phaser.GameObjects.Text;
+  private bossHealthBar: HealthBar | null = null;
+  private bossNameText: Phaser.GameObjects.Text | null = null;
   private dead = false;
+  private currentPhase = 0;
+  private maxHealth: number;
   private damageHandler: (data: { entity: string; currentHealth: number }) => void;
   private deathHandler: (data: { entity: string }) => void;
 
   constructor(scene: Phaser.Scene, x: number, y: number, bossType: string) {
     this.scene = scene;
     this.config = BOSS_CONFIGS[bossType];
+    this.maxHealth = this.config.maxHealth;
 
     const textureKey = BOSS_TEXTURE_MAP[bossType] ?? TextureKeys.ENEMY_WOLF;
     this.enemy = new Enemy(scene, x, y, textureKey, this.config);
@@ -110,7 +130,10 @@ export class BossEnemy {
 
     this.damageHandler = (data) => {
       if (data.entity === this.config.name) {
-        this.bossHealthBar.setHealth(data.currentHealth);
+        if (this.bossHealthBar) {
+          this.bossHealthBar.setHealth(data.currentHealth);
+        }
+        this.checkPhaseTransition(data.currentHealth);
       }
     };
     EventBus.on(Events.ENTITY_DAMAGED, this.damageHandler);
@@ -118,11 +141,19 @@ export class BossEnemy {
     this.deathHandler = (data) => {
       if (data.entity === this.config.name) {
         this.dead = true;
-        this.bossHealthBar.setHealth(0);
+        if (this.bossHealthBar) {
+          this.bossHealthBar.setHealth(0);
+        }
 
         this.scene.time.delayedCall(500, () => {
-          this.bossHealthBar.destroy();
-          this.bossNameText.destroy();
+          if (this.bossHealthBar) {
+            this.bossHealthBar.destroy();
+            this.bossHealthBar = null;
+          }
+          if (this.bossNameText) {
+            this.bossNameText.destroy();
+            this.bossNameText = null;
+          }
         });
 
         EventBus.emit(Events.SHOW_NOTIFICATION, {
@@ -157,6 +188,10 @@ export class BossEnemy {
     return this.config;
   }
 
+  getEffectiveDamage(): number {
+    return this.enemy.getEffectiveDamage();
+  }
+
   isDead(): boolean {
     return this.dead || this.enemy.isDead();
   }
@@ -164,8 +199,33 @@ export class BossEnemy {
   destroy(): void {
     this.removeListeners();
     this.enemy.destroy();
-    this.bossHealthBar.destroy();
-    this.bossNameText.destroy();
+    if (this.bossHealthBar) {
+      this.bossHealthBar.destroy();
+      this.bossHealthBar = null;
+    }
+    if (this.bossNameText) {
+      this.bossNameText.destroy();
+      this.bossNameText = null;
+    }
+  }
+
+  private checkPhaseTransition(currentHealth: number): void {
+    const phaseConfigs = this.config.phaseConfigs;
+    if (!phaseConfigs || this.currentPhase >= phaseConfigs.length) return;
+
+    const nextPhase = phaseConfigs[this.currentPhase];
+    const healthRatio = currentHealth / this.maxHealth;
+
+    if (healthRatio <= nextPhase.threshold) {
+      this.currentPhase++;
+      this.enemy.setSpeedMultiplier(nextPhase.speedMult);
+      this.enemy.setDamageMultiplier(nextPhase.damageMult);
+      this.enemy.sprite.setTint(nextPhase.tint);
+      this.scene.cameras.main.shake(200, 0.01);
+      EventBus.emit(Events.SHOW_NOTIFICATION, {
+        message: `${this.config.bossName} enters a frenzy!`,
+      });
+    }
   }
 
   private removeListeners(): void {
