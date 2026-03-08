@@ -59,6 +59,10 @@ export const Events = {
   SETTINGS_OPEN: 'ui:settings_open',
   SETTINGS_CLOSE: 'ui:settings_close',
 
+  // Building events
+  BUILDING_ENTER: 'building:enter',
+  BUILDING_EXIT: 'building:exit',
+
   // LLM events
   LLM_CONFIG_CHANGED: 'llm:config_changed',
 } as const;

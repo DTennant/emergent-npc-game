@@ -12,6 +12,7 @@ import { AldricJournal, JOURNAL_PAGES } from '../story/AldricJournal';
 import { CombatSystem } from '../combat/CombatSystem';
 import { HealthBar } from '../combat/HealthBar';
 import { NPC_SHOPS } from '../crafting/TradeData';
+import { BUILDING_INTERIORS, BuildingInterior } from '../buildings/BuildingData';
 import {
   GAME_WIDTH,
   GAME_HEIGHT,
@@ -81,6 +82,7 @@ export class WorldScene extends Phaser.Scene {
   private spawnY = GAME_HEIGHT / 2;
   private innMarker: Phaser.GameObjects.Text | null = null;
   private innMarkerListener: ((data: { npc: { persona: { id: string; name: string } } }) => void) | null = null;
+  private buildingEntrances: { building: BuildingInterior; x: number; y: number; w: number; h: number; label: string }[] = [];
 
   constructor() {
     super({ key: 'WorldScene' });
@@ -139,6 +141,7 @@ export class WorldScene extends Phaser.Scene {
     this.restoreFromSave();
 
     this.createItemPickups();
+    this.createBuildingEntrances();
 
     EventBus.on(Events.DAY_CHANGE, this.onDayChange, this);
     EventBus.on(Events.DIALOGUE_END, this.onDialogueEnd, this);
@@ -190,6 +193,7 @@ export class WorldScene extends Phaser.Scene {
         this.startDialogue(this.nearestNPC);
         return;
       }
+      if (this.tryEnterBuilding()) return;
       if (this.isNearShrine()) {
         this.tryActivateShrine();
         return;
@@ -571,6 +575,13 @@ export class WorldScene extends Phaser.Scene {
       this.interactionPrompt.setText('[E] Activate Shrine');
       this.interactionPrompt.setVisible(true);
     } else {
+      const nearBuilding = this.getNearbyBuildingEntrance();
+      if (nearBuilding) {
+        this.interactionPrompt.setPosition(nearBuilding.x, nearBuilding.y - 20);
+        this.interactionPrompt.setText(`[E] Enter ${nearBuilding.label}`);
+        this.interactionPrompt.setVisible(true);
+        return;
+      }
       const nearPage = this.getNearbyJournalPage();
       if (nearPage) {
         this.interactionPrompt.setPosition(nearPage.position.x, nearPage.position.y - 20);
@@ -617,6 +628,7 @@ export class WorldScene extends Phaser.Scene {
       fontSize: fs(38),
       color: '#ffffff',
       align: 'center',
+      wordWrap: { width: 380 },
       resolution: window.devicePixelRatio,
     }).setOrigin(0.5).setDepth(201);
     const hint = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 20, '[Y] Yes    [N] No', {
@@ -741,6 +753,62 @@ export class WorldScene extends Phaser.Scene {
       }
     }
     return false;
+  }
+
+  private createBuildingEntrances(): void {
+    const buildingPositions: Record<string, { x: number; y: number; w: number; h: number; label: string }> = {
+      forge: { x: 368, y: 288, w: 80, h: 60, label: 'Forge' },
+      inn: { x: 704, y: 288, w: 90, h: 70, label: 'Inn' },
+      market: { x: 592, y: 464, w: 70, h: 50, label: 'Shop' },
+      farm: { x: 1024, y: 688, w: 100, h: 60, label: 'Farmhouse' },
+      guard_post: { x: 160, y: 560, w: 60, h: 50, label: 'Guard Post' },
+      herbs: { x: 800, y: 160, w: 70, h: 50, label: 'Herb Shop' },
+    };
+
+    for (const interior of BUILDING_INTERIORS) {
+      const pos = buildingPositions[interior.id];
+      if (!pos) continue;
+      this.buildingEntrances.push({
+        building: interior,
+        x: pos.x,
+        y: pos.y + pos.h / 2 + 12,
+        w: pos.w,
+        h: 20,
+        label: pos.label,
+      });
+    }
+  }
+
+  private getNearbyBuildingEntrance(): typeof this.buildingEntrances[number] | null {
+    for (const entrance of this.buildingEntrances) {
+      const dx = this.player.x - entrance.x;
+      const dy = this.player.y - entrance.y;
+      if (Math.sqrt(dx * dx + dy * dy) < INTERACTION_DISTANCE) {
+        return entrance;
+      }
+    }
+    return null;
+  }
+
+  private tryEnterBuilding(): boolean {
+    const entrance = this.getNearbyBuildingEntrance();
+    if (!entrance) return false;
+
+    this.transitioning = true;
+    this.saveNPCState();
+    this.saveGame();
+    this.cleanupEvents();
+    this.scene.stop('HUDScene');
+    this.cameras.main.fadeOut(400);
+    this.time.delayedCall(400, () => {
+      this.scene.start('BuildingInteriorScene', {
+        buildingId: entrance.building.id,
+        returnScene: 'WorldScene',
+        returnX: entrance.x,
+        returnY: entrance.y + TILE_SIZE,
+      });
+    });
+    return true;
   }
 
   private saveGame(): void {
@@ -1101,7 +1169,7 @@ export class WorldScene extends Phaser.Scene {
     titleText.setDepth(301);
 
     const bodyText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.5, storyBeats[0], {
-      fontSize: fs(56),
+      fontSize: fs(32),
       color: '#ffffff',
       align: 'center',
       wordWrap: { width: GAME_WIDTH * 0.7 },
