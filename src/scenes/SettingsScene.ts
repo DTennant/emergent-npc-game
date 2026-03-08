@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, fs, fsn } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT, fs, fsn, getFontScale } from '../config';
 import { EventBus, Events } from '../world/EventBus';
 
 function getInputStyle(): string {
@@ -46,7 +46,8 @@ export class SettingsScene extends Phaser.Scene {
     const panelX = GAME_WIDTH / 2;
     const panelY = GAME_HEIGHT / 2;
 
-    const panel = this.add.rectangle(panelX, panelY, 500, 580, 0x1a1a2e, 1);
+    const panelW = Math.min(GAME_WIDTH - 40, Math.max(500, 500 * getFontScale()));
+    const panel = this.add.rectangle(panelX, panelY, panelW, 580, 0x1a1a2e, 1);
     panel.setStrokeStyle(2, 0x4488ff);
     panel.setDepth(51);
 
@@ -159,7 +160,11 @@ export class SettingsScene extends Phaser.Scene {
       });
       text.on('pointerdown', () => {
         localStorage.setItem('font_scale', opt.value);
-        window.location.reload();
+        this.cleanupInputs();
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        this.scene.restart({ onClose: this.onClose });
       });
     }
   }
@@ -351,6 +356,9 @@ export class SettingsScene extends Phaser.Scene {
 
   private closeSettings(): void {
     this.cleanupInputs();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     EventBus.emit(Events.SETTINGS_CLOSE);
 
     if (this.onClose) {
@@ -367,5 +375,8 @@ export class SettingsScene extends Phaser.Scene {
 
   shutdown(): void {
     this.cleanupInputs();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
   }
 }

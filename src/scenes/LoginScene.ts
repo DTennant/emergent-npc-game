@@ -218,6 +218,9 @@ export class LoginScene extends Phaser.Scene {
     const name = this.usernameInput.value.trim() || 'Adventurer';
     localStorage.setItem('player_name', name);
     this.cleanupInputs();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     this.scene.start('BootScene');
   }
 

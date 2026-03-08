@@ -249,5 +249,8 @@ export class DialogueScene extends Phaser.Scene {
     if (this.styleElement?.parentNode) {
       this.styleElement.parentNode.removeChild(this.styleElement);
     }
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
   }
 }
