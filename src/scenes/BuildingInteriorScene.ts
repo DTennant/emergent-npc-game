@@ -49,6 +49,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
   private inTrading = false;
   private inCrafting = false;
   private cleanedUp = false;
+  private invalidBuilding = false;
   private furnitureGroup!: Phaser.Physics.Arcade.StaticGroup;
   private wallGroup!: Phaser.Physics.Arcade.StaticGroup;
   private playerFacing = 'down';
@@ -58,8 +59,15 @@ export class BuildingInteriorScene extends Phaser.Scene {
   }
 
   init(data: BuildingInitData): void {
+    this.invalidBuilding = false;
+    this.inDialogue = false;
+    this.inInventory = false;
+    this.inCrafting = false;
+    this.inTrading = false;
+    this.cleanedUp = false;
     const def = BUILDING_INTERIORS.find((b) => b.id === data.buildingId);
     if (!def) {
+      this.invalidBuilding = true;
       this.scene.start(data.returnScene ?? 'WorldScene');
       return;
     }
@@ -70,6 +78,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
   }
 
   create(): void {
+    if (this.invalidBuilding) return;
     const gs = GameState.get(this);
     this.cleanedUp = false;
 
@@ -425,7 +434,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
   private startDialogue(): void {
     if (!this.npc) return;
     if (this.npc.isSleeping()) {
-      EventBus.emit(Events.SHOW_NOTIFICATION, { text: `${this.npc.persona.name} is sleeping...` });
+      EventBus.emit(Events.SHOW_NOTIFICATION, { message: `${this.npc.persona.name} is sleeping...` });
       return;
     }
     const gs = GameState.get(this);

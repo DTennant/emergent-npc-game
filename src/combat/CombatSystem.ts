@@ -8,6 +8,10 @@ import {
   PLAYER_MAX_HEALTH,
   INVINCIBILITY_MS,
   TILE_SIZE,
+  PLAYER_SPEED,
+  DASH_SPEED_MULTIPLIER,
+  DASH_DURATION_MS,
+  DASH_COOLDOWN_MS,
 } from '../config';
 
 const CONSUMABLE_HEAL: Record<string, number> = {
@@ -24,6 +28,9 @@ export class CombatSystem {
   private currentHealth: number;
   private maxHealth: number;
   private knockbackTimer = 0;
+  private isDashing = false;
+  private dashTimer = 0;
+  private dashCooldownTimer = 0;
 
   constructor(scene: Phaser.Scene, player: Phaser.Physics.Arcade.Sprite) {
     this.scene = scene;
@@ -75,11 +82,17 @@ export class CombatSystem {
     return this.scene.time.now - this.lastAttackTime < ATTACK_COOLDOWN_MS;
   }
 
-  getAttackDamage(inventory: Inventory): number {
+  setMaxHealth(maxHealth: number): void {
+    const healthPercent = this.currentHealth / this.maxHealth;
+    this.maxHealth = maxHealth;
+    this.currentHealth = Math.round(maxHealth * healthPercent);
+  }
+
+  getAttackDamage(inventory: Inventory, bonusDamage = 0): number {
     const weaponId = inventory.getEquipped('weapon');
-    if (!weaponId) return 1;
+    if (!weaponId) return 1 + bonusDamage;
     const def = ITEMS[weaponId];
-    return def?.stats?.damage ?? 1;
+    return (def?.stats?.damage ?? 1) + bonusDamage;
   }
 
   getDefense(inventory: Inventory): number {
@@ -136,6 +149,55 @@ export class CombatSystem {
     if (this.knockbackTimer > 0) {
       this.knockbackTimer -= delta;
     }
+    if (this.dashCooldownTimer > 0) {
+      this.dashCooldownTimer -= delta;
+    }
+    if (this.dashTimer > 0) {
+      this.dashTimer -= delta;
+      if (this.dashTimer <= 0) {
+        this.isDashing = false;
+        this.inIFrames = false;
+        this.player.clearTint();
+      }
+    }
+  }
+
+  dash(facingDirection: string): boolean {
+    if (this.isDashing || this.dashCooldownTimer > 0 || this.knockbackTimer > 0) return false;
+
+    this.isDashing = true;
+    this.dashTimer = DASH_DURATION_MS;
+    this.dashCooldownTimer = DASH_DURATION_MS + DASH_COOLDOWN_MS;
+    this.inIFrames = true;
+
+    let dx = 0;
+    let dy = 0;
+    switch (facingDirection) {
+      case 'up': dy = -1; break;
+      case 'down': dy = 1; break;
+      case 'left': dx = -1; break;
+      case 'right': dx = 1; break;
+    }
+
+    const dashSpeed = PLAYER_SPEED * DASH_SPEED_MULTIPLIER;
+    this.player.setVelocity(dx * dashSpeed, dy * dashSpeed);
+
+    this.scene.tweens.add({
+      targets: this.player,
+      alpha: { from: 0.3, to: 1 },
+      duration: 60,
+      yoyo: true,
+      repeat: 1,
+      onComplete: () => {
+        this.player.setAlpha(1);
+      },
+    });
+
+    return true;
+  }
+
+  isDashActive(): boolean {
+    return this.isDashing;
   }
 
   isKnockedBack(): boolean {
@@ -171,15 +233,33 @@ export class CombatSystem {
     if (!inventory.hasItem(itemId)) return false;
 
     inventory.removeItem(itemId, 1);
-    this.restoreHealth(healAmount);
 
     EventBus.emit(Events.ITEM_USED, { itemId, healAmount });
-    EventBus.emit(Events.ENTITY_DAMAGED, {
-      entity: 'player',
-      damage: 0,
-      currentHealth: this.currentHealth,
-      maxHealth: this.maxHealth,
-    });
+
+    if (itemId === 'provisions') {
+      // Heal 4 HP every 500ms, 5 ticks = 20 total
+      this.scene.time.addEvent({
+        delay: 500,
+        repeat: 4,
+        callback: () => {
+          this.restoreHealth(4);
+          EventBus.emit(Events.ENTITY_DAMAGED, {
+            entity: 'player',
+            damage: 0,
+            currentHealth: this.currentHealth,
+            maxHealth: this.maxHealth,
+          });
+        },
+      });
+    } else {
+      this.restoreHealth(healAmount);
+      EventBus.emit(Events.ENTITY_DAMAGED, {
+        entity: 'player',
+        damage: 0,
+        currentHealth: this.currentHealth,
+        maxHealth: this.maxHealth,
+      });
+    }
 
     return true;
   }

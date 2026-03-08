@@ -12,7 +12,7 @@ const TELEPORT_KEYS: { key: string; label: string; x: number; y: number }[] = [
   { key: 'SIX', label: '6: Guard', x: 160, y: 620 },
   { key: 'SEVEN', label: '7: Herbs', x: 800, y: 220 },
   { key: 'EIGHT', label: '8: Woods', x: GAME_WIDTH - 40, y: GAME_HEIGHT / 2 },
-  { key: 'NINE', label: '9: Shrine', x: 200, y: 200 },
+  { key: 'NINE', label: '9: Shrine', x: 640, y: 96 },
 ];
 
 interface NPCLike {

@@ -231,6 +231,10 @@ export class VictoryScene extends Phaser.Scene {
     });
   }
 
+  shutdown(): void {
+    this.tweens.killAll();
+  }
+
   private close(): void {
     this.scene.stop('VictoryScene');
   }

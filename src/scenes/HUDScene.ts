@@ -27,6 +27,9 @@ export class HUDScene extends Phaser.Scene {
   private helpKey!: Phaser.Input.Keyboard.Key;
   private minimapKey!: Phaser.Input.Keyboard.Key;
   private barHeight = 48;
+  private levelText!: Phaser.GameObjects.Text;
+  private xpBarBg!: Phaser.GameObjects.Rectangle;
+  private xpBarFill!: Phaser.GameObjects.Rectangle;
 
   // Minimap
   private minimapContainer!: Phaser.GameObjects.Container;
@@ -73,6 +76,23 @@ export class HUDScene extends Phaser.Scene {
     });
     this.dayText.setDepth(101);
     this.dayText.setX(this.timeText.x + this.timeText.width + 12);
+
+    this.levelText = this.add.text(0, textY, 'Lv.1', {
+      fontSize: fs(34),
+      color: '#44ff88',
+      stroke: '#000000',
+      strokeThickness: 3,
+      resolution: window.devicePixelRatio,
+    });
+    this.levelText.setDepth(101);
+
+    const xpBarY = barH + 1;
+    this.xpBarBg = this.add.rectangle(0, xpBarY, GAME_WIDTH, 4, 0x333333);
+    this.xpBarBg.setOrigin(0, 0);
+    this.xpBarBg.setDepth(100);
+    this.xpBarFill = this.add.rectangle(0, xpBarY, 0, 4, 0x44ff88);
+    this.xpBarFill.setOrigin(0, 0);
+    this.xpBarFill.setDepth(101);
 
     const settingsBtn = this.add.text(GAME_WIDTH - 10, textY, '\u2699\uFE0F', {
       fontSize: fs(42),
@@ -157,6 +177,8 @@ export class HUDScene extends Phaser.Scene {
     EventBus.on(Events.TRADE_COMPLETE, this.onTradeComplete, this);
     EventBus.on(Events.QUEST_PROGRESS, this.onQuestProgress, this);
     EventBus.on(Events.ENTITY_DAMAGED, this.onEntityDamaged, this);
+    EventBus.on(Events.XP_GAINED, this.onXPGained, this);
+    EventBus.on(Events.LEVEL_UP, this.onLevelUp, this);
 
     this.helpKey = this.input.keyboard!.addKey('H');
     this.helpKey.on('down', () => this.toggleHelp());
@@ -173,12 +195,15 @@ export class HUDScene extends Phaser.Scene {
     this.time.delayedCall(15000, () => {
       this.showHint('check_quest', 'Press H for help. Head east (\u2192) to find the Dark Woods when ready.');
     });
+
+    this.updateLevelDisplay();
   }
 
   update(_time: number, delta: number): void {
     this.timeText.setText(`\uD83D\uDD50 ${this.worldState.getTimeString()}`);
     this.dayText.setText(`\uD83D\uDCC5 Day ${this.worldState.getDay()}`);
     this.dayText.setX(this.timeText.x + this.timeText.width + 12);
+    this.levelText.setX(this.dayText.x + this.dayText.width + 12);
 
     if (this.time.now % 1000 < delta) {
       this.updateQuestTracker();
@@ -204,6 +229,8 @@ export class HUDScene extends Phaser.Scene {
     EventBus.off(Events.TRADE_COMPLETE, this.onTradeComplete, this);
     EventBus.off(Events.QUEST_PROGRESS, this.onQuestProgress, this);
     EventBus.off(Events.ENTITY_DAMAGED, this.onEntityDamaged, this);
+    EventBus.off(Events.XP_GAINED, this.onXPGained, this);
+    EventBus.off(Events.LEVEL_UP, this.onLevelUp, this);
     if (this.helpKey) {
       this.helpKey.removeAllListeners();
     }
@@ -269,6 +296,25 @@ export class HUDScene extends Phaser.Scene {
     if (data.entity === 'player' && data.currentHealth < data.maxHealth * 0.3) {
       this.showHint('low_health', 'Your health is low! Find safety or eat provisions.');
     }
+  }
+
+  private onXPGained(_data: { xp: number; totalXP: number; level: number }): void {
+    this.updateLevelDisplay();
+  }
+
+  private onLevelUp(data: { level: number }): void {
+    this.updateLevelDisplay();
+    this.cameras.main.flash(300, 68, 255, 68);
+    EventBus.emit(Events.SHOW_NOTIFICATION, { message: `Level Up! You are now level ${data.level}!` });
+  }
+
+  private updateLevelDisplay(): void {
+    const gs = GameState.get(this);
+    this.levelText.setText(`Lv.${gs.playerLevel}`);
+    this.levelText.setX(this.dayText.x + this.dayText.width + 12);
+
+    const xpRatio = gs.playerXP / gs.getXPForNextLevel();
+    this.xpBarFill.setSize(GAME_WIDTH * xpRatio, 4);
   }
 
   private showNotification(text: string): void {

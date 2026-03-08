@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, fs, fsn, getFontScale } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT, fs, fsn, getFontScale, invalidateFontScaleCache } from '../config';
 import { EventBus, Events } from '../world/EventBus';
 
 function getInputStyle(): string {
@@ -160,6 +160,7 @@ export class SettingsScene extends Phaser.Scene {
       });
       text.on('pointerdown', () => {
         localStorage.setItem('font_scale', opt.value);
+        invalidateFontScaleCache();
         this.cleanupInputs();
         if (document.activeElement instanceof HTMLElement) {
           document.activeElement.blur();

@@ -29,6 +29,8 @@ export interface SaveData {
   player: { x: number; y: number };
   currentZone?: 'village' | 'woods' | 'dungeon' | 'ancient_forest';
   journal?: { discoveredPages: string[] };
+  ancientForestClearing?: number;
+  progression?: { level: number; xp: number; bonusDamage: number };
 }
 
 const SAVE_KEY = 'game_save';
@@ -50,7 +52,9 @@ export class SaveManager {
     inventory: Inventory,
     playerPosition: { x: number; y: number },
     currentZone: 'village' | 'woods' | 'dungeon' | 'ancient_forest' = 'village',
-    aldricJournal?: AldricJournal
+    aldricJournal?: AldricJournal,
+    ancientForestClearing?: number,
+    progression?: { level: number; xp: number; bonusDamage: number }
   ): void {
     const npcData: Record<string, NPCSaveData> = {};
     for (const npc of npcs) {
@@ -70,6 +74,8 @@ export class SaveManager {
       player: { x: playerPosition.x, y: playerPosition.y },
       currentZone,
       journal: aldricJournal ? aldricJournal.toJSON() : { discoveredPages: [] },
+      ancientForestClearing: ancientForestClearing,
+      progression: progression,
     };
 
     try {

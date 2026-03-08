@@ -5,7 +5,7 @@ import { MemoryManager } from '../memory/MemoryManager';
 import { LLMClient } from '../ai/LLMClient';
 import { WorldState } from '../world/WorldState';
 import { LLMResponse } from '../memory/types';
-import { GAME_WIDTH, GAME_HEIGHT, NPC_SPEED, TILE_SIZE, GUARD_PATROL_WAYPOINTS, PATROL_PAUSE_MS } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT, NPC_SPEED, TILE_SIZE, GUARD_PATROL_WAYPOINTS, PATROL_PAUSE_MS, fs } from '../config';
 import { EventBus, Events } from '../world/EventBus';
 import { QuestGateChecker } from '../quest/QuestGates';
 import { StorylineManager } from '../story/StorylineManager';
@@ -66,7 +66,7 @@ export class NPC {
       persona.workPosition.y - TILE_SIZE * 0.7,
       persona.name,
       {
-        fontSize: '11px',
+        fontSize: fs(11),
         color: '#ffffff',
         stroke: '#000000',
         strokeThickness: 2,

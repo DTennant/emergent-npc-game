@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameState } from '../world/GameState';
 import { BlightSystem } from '../world/BlightSystem';
+import { DayNightSystem } from '../world/DayNightSystem';
 import { EventBus, Events } from '../world/EventBus';
 import { TextureKeys } from '../assets/keys';
 import { CombatSystem } from '../combat/CombatSystem';
@@ -51,6 +52,7 @@ export class WoodsScene extends Phaser.Scene {
     I: Phaser.Input.Keyboard.Key;
   };
   private spaceKey!: Phaser.Input.Keyboard.Key;
+  private shiftKey!: Phaser.Input.Keyboard.Key;
   private combatSystem!: CombatSystem;
   private playerHealthBar!: HealthBar;
   private playerFacing = 'down';
@@ -64,6 +66,7 @@ export class WoodsScene extends Phaser.Scene {
   private spawnX = 60;
   private spawnY = GAME_HEIGHT / 2;
   private blightParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+  private dayNightSystem!: DayNightSystem;
 
   constructor() {
     super({ key: 'WoodsScene' });
@@ -77,6 +80,7 @@ export class WoodsScene extends Phaser.Scene {
     this.enemies = [];
     this.dungeonEntranceZones = [];
     this.itemPickups = [];
+    this.dayNightSystem = null!;
   }
 
   create(): void {
@@ -128,13 +132,15 @@ export class WoodsScene extends Phaser.Scene {
     this.playerLabel.setDepth(11);
 
     this.combatSystem = new CombatSystem(this, this.player);
+    const gsWoods = GameState.get(this);
+    this.combatSystem.setMaxHealth(gsWoods.getMaxHealth());
     this.playerHealthBar = new HealthBar(
       this,
       this.player.x,
       this.player.y - TILE_SIZE,
       TILE_SIZE,
       4,
-      PLAYER_MAX_HEALTH
+      gsWoods.getMaxHealth()
     );
 
     this.createDungeonEntrances();
@@ -155,6 +161,7 @@ export class WoodsScene extends Phaser.Scene {
       I: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.I),
     };
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
 
     this.interactionPrompt = this.add.text(0, 0, '', {
       fontSize: fs(26),
@@ -204,15 +211,21 @@ export class WoodsScene extends Phaser.Scene {
       this.handlePlayerAttack();
     });
 
+    this.shiftKey.on('down', () => {
+      if (this.transitioning || this.inInventory) return;
+      this.combatSystem.dash(this.playerFacing);
+    });
+
     this.cameras.main.resetFX();
     this.cameras.main.fadeIn(400);
   }
 
   update(_time: number, delta: number): void {
-    if (this.transitioning) return;
+    if (this.transitioning || this.inInventory) return;
 
     const gs = GameState.get(this);
     gs.worldState.update(delta);
+    this.dayNightSystem.update(gs.worldState.getHour());
     gs.playerPosition = { x: this.player.x, y: this.player.y };
 
     if (this.blightParticles) {
@@ -247,6 +260,9 @@ export class WoodsScene extends Phaser.Scene {
     EventBus.off(Events.PLAYER_DIED, this.onPlayerDied, this);
     EventBus.off(Events.ENTITY_DIED, this.onEntityDied, this);
     EventBus.off(Events.ITEM_ACQUIRED, this.onItemAcquired, this);
+    if (this.dayNightSystem) {
+      this.dayNightSystem.destroy();
+    }
   }
 
   private onPlayerDied(): void {
@@ -258,6 +274,8 @@ export class WoodsScene extends Phaser.Scene {
     for (const drop of data.drops) {
       gs.inventory.addItem(drop.itemId, drop.quantity);
     }
+    const xpAmount = data.entity.includes('Ancient') ? 25 : 15;
+    gs.addXP(xpAmount);
     EventBus.emit(Events.SHOW_NOTIFICATION, { message: `${data.entity} defeated!` });
   }
 
@@ -377,6 +395,7 @@ export class WoodsScene extends Phaser.Scene {
   private handlePlayerMovement(): void {
     this.combatSystem.update(this.game.loop.delta);
     if (this.combatSystem.isKnockedBack()) return;
+    if (this.combatSystem.isDashActive()) return;
 
     let dx = 0;
     let dy = 0;
@@ -644,7 +663,7 @@ export class WoodsScene extends Phaser.Scene {
         zone,
         enemy.sprite,
         () => {
-          const damage = this.combatSystem.getAttackDamage(gs.inventory);
+          const damage = this.combatSystem.getAttackDamage(gs.inventory, gs.playerBonusDamage);
           if (damage > 0) {
             enemy.takeDamage(damage);
             this.showDamageNumber(enemy.sprite.x, enemy.sprite.y - 20, damage);
@@ -730,10 +749,13 @@ export class WoodsScene extends Phaser.Scene {
 
   private handlePlayerDeath(): void {
     this.combatSystem.resetHealth();
+    EventBus.emit(Events.SHOW_NOTIFICATION, { message: 'You have fallen... Returning to village.' });
+    for (const enemy of this.enemies) {
+      enemy.destroy();
+    }
+    this.enemies = [];
     this.cleanupEvents();
     this.scene.stop('HUDScene');
-
-    EventBus.emit(Events.SHOW_NOTIFICATION, 'You have fallen... Returning to village.');
 
     this.cameras.main.fadeOut(400);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {

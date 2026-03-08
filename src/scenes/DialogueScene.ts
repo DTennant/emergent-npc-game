@@ -165,14 +165,19 @@ export class DialogueScene extends Phaser.Scene {
     this.conversationLog.push({ speaker: this.npc.persona.name, text: '...', isTyping: true });
     this.updateDialogueDisplay();
 
-    const response = await this.npc.generateResponse(
-      this.llmClient,
-      '(Player approaches)',
-      this.worldState,
-      this.storylineManager
-    );
-    
-    this.conversationLog[typingIdx] = { speaker: this.npc.persona.name, text: response.dialogue };
+    try {
+      const response = await this.npc.generateResponse(
+        this.llmClient,
+        '(Player approaches)',
+        this.worldState,
+        this.storylineManager
+      );
+      
+      this.conversationLog[typingIdx] = { speaker: this.npc.persona.name, text: response.dialogue };
+    } catch (err) {
+      console.error('Failed to get NPC greeting:', err);
+      this.conversationLog[typingIdx] = { speaker: this.npc.persona.name, text: '(Failed to get response. Try again.)' };
+    }
     this.updateDialogueDisplay();
     this.isWaiting = false;
   }
@@ -187,14 +192,19 @@ export class DialogueScene extends Phaser.Scene {
     this.conversationLog.push({ speaker: this.npc.persona.name, text: '...', isTyping: true });
     this.updateDialogueDisplay();
 
-    const response = await this.npc.generateResponse(
-      this.llmClient,
-      message,
-      this.worldState,
-      this.storylineManager
-    );
+    try {
+      const response = await this.npc.generateResponse(
+        this.llmClient,
+        message,
+        this.worldState,
+        this.storylineManager
+      );
 
-    this.conversationLog[typingIdx] = { speaker: this.npc.persona.name, text: response.dialogue };
+      this.conversationLog[typingIdx] = { speaker: this.npc.persona.name, text: response.dialogue };
+    } catch (err) {
+      console.error('Failed to get NPC response:', err);
+      this.conversationLog[typingIdx] = { speaker: this.npc.persona.name, text: '(Failed to get response. Try again.)' };
+    }
     this.updateDialogueDisplay();
     this.isWaiting = false;
   }
@@ -236,6 +246,9 @@ export class DialogueScene extends Phaser.Scene {
   }
 
   shutdown(): void {
+    if (this.onClose) {
+      this.onClose();
+    }
     this.cleanup();
   }
 

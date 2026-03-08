@@ -27,6 +27,9 @@ export const ATTACK_COOLDOWN_MS = 500;
 export const ATTACK_RANGE = TILE_SIZE;
 export const PLAYER_MAX_HEALTH = 100;
 export const INVINCIBILITY_MS = 250;
+export const DASH_SPEED_MULTIPLIER = 3;
+export const DASH_DURATION_MS = 120;
+export const DASH_COOLDOWN_MS = 800;
 
 export const GOSSIP_RANGE = TILE_SIZE * 4;
 export const GOSSIP_INTERVAL_MS = 10000;
@@ -64,9 +67,17 @@ export const FONT_SCALE_OPTIONS = {
 
 export type FontScaleKey = keyof typeof FONT_SCALE_OPTIONS;
 
+let cachedFontScale: number | null = null;
+
 export function getFontScale(): number {
+  if (cachedFontScale !== null) return cachedFontScale;
   const key = (localStorage.getItem('font_scale') || 'medium') as FontScaleKey;
-  return FONT_SCALE_OPTIONS[key] ?? 1.0;
+  cachedFontScale = FONT_SCALE_OPTIONS[key] ?? 1.0;
+  return cachedFontScale;
+}
+
+export function invalidateFontScaleCache(): void {
+  cachedFontScale = null;
 }
 
 export function fs(baseSize: number): string {

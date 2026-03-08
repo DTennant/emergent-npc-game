@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameState } from '../world/GameState';
 import { BlightSystem } from '../world/BlightSystem';
+import { DayNightSystem } from '../world/DayNightSystem';
 import { EventBus, Events } from '../world/EventBus';
 import { TextureKeys } from '../assets/keys';
 import { CombatSystem } from '../combat/CombatSystem';
@@ -120,6 +121,7 @@ export class AncientForestScene extends Phaser.Scene {
     I: Phaser.Input.Keyboard.Key;
   };
   private spaceKey!: Phaser.Input.Keyboard.Key;
+  private shiftKey!: Phaser.Input.Keyboard.Key;
   private combatSystem!: CombatSystem;
   private playerHealthBar!: HealthBar;
   private playerFacing = 'down';
@@ -137,6 +139,7 @@ export class AncientForestScene extends Phaser.Scene {
   private titleText: Phaser.GameObjects.Text | null = null;
   private darkOverlay: Phaser.GameObjects.Rectangle | null = null;
   private vortexGraphics: Phaser.GameObjects.Arc | null = null;
+  private dayNightSystem!: DayNightSystem;
 
   constructor() {
     super({ key: 'AncientForestScene' });
@@ -149,12 +152,14 @@ export class AncientForestScene extends Phaser.Scene {
     this.inInventory = false;
     this.enemies = [];
     this.itemPickups = [];
-    this.currentClearing = 0;
+    const gs = GameState.get(this);
+    this.currentClearing = gs.ancientForestClearing;
     this.blightParticles = null;
     this.clearingObjects = [];
     this.titleText = null;
     this.darkOverlay = null;
     this.vortexGraphics = null;
+    this.dayNightSystem = null!;
   }
 
   create(): void {
@@ -206,13 +211,15 @@ export class AncientForestScene extends Phaser.Scene {
     this.playerLabel.setDepth(11);
 
     this.combatSystem = new CombatSystem(this, this.player);
+    const gsForest = GameState.get(this);
+    this.combatSystem.setMaxHealth(gsForest.getMaxHealth());
     this.playerHealthBar = new HealthBar(
       this,
       this.player.x,
       this.player.y - TILE_SIZE,
       TILE_SIZE,
       4,
-      PLAYER_MAX_HEALTH
+      gsForest.getMaxHealth()
     );
 
     EventBus.on(Events.PLAYER_DIED, this.onPlayerDied, this);
@@ -229,6 +236,7 @@ export class AncientForestScene extends Phaser.Scene {
       I: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.I),
     };
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
 
     this.interactionPrompt = this.add.text(0, 0, '', {
       fontSize: fs(26),
@@ -278,7 +286,14 @@ export class AncientForestScene extends Phaser.Scene {
       this.handlePlayerAttack();
     });
 
+    this.shiftKey.on('down', () => {
+      if (this.transitioning || this.inInventory) return;
+      this.combatSystem.dash(this.playerFacing);
+    });
+
     this.loadClearing();
+
+    this.dayNightSystem = new DayNightSystem(this);
 
     this.cameras.main.resetFX();
     this.cameras.main.fadeIn(400);
@@ -289,6 +304,8 @@ export class AncientForestScene extends Phaser.Scene {
 
     const gs = GameState.get(this);
     gs.worldState.update(delta);
+    this.dayNightSystem.update(gs.worldState.getHour());
+    gs.playerPosition = { x: this.player.x, y: this.player.y };
 
     if (this.blightParticles) {
       const intensity = Math.max(0.4, this.blightSystem?.getIntensity() ?? 0);
@@ -323,6 +340,9 @@ export class AncientForestScene extends Phaser.Scene {
     EventBus.off(Events.PLAYER_DIED, this.onPlayerDied, this);
     EventBus.off(Events.ENTITY_DIED, this.onEntityDied, this);
     EventBus.off(Events.ITEM_ACQUIRED, this.onItemAcquired, this);
+    if (this.dayNightSystem) {
+      this.dayNightSystem.destroy();
+    }
   }
 
   private onPlayerDied(): void {
@@ -334,6 +354,8 @@ export class AncientForestScene extends Phaser.Scene {
     for (const drop of data.drops) {
       gs.inventory.addItem(drop.itemId, drop.quantity);
     }
+    const xpAmount = data.entity.includes('Ancient') ? 25 : 15;
+    gs.addXP(xpAmount);
     EventBus.emit(Events.SHOW_NOTIFICATION, { message: `${data.entity} defeated!` });
   }
 
@@ -720,6 +742,7 @@ export class AncientForestScene extends Phaser.Scene {
   private handlePlayerMovement(): void {
     this.combatSystem.update(this.game.loop.delta);
     if (this.combatSystem.isKnockedBack()) return;
+    if (this.combatSystem.isDashActive()) return;
 
     let dx = 0;
     let dy = 0;
@@ -770,7 +793,7 @@ export class AncientForestScene extends Phaser.Scene {
         zone,
         enemy.sprite,
         () => {
-          const damage = this.combatSystem.getAttackDamage(gs.inventory);
+          const damage = this.combatSystem.getAttackDamage(gs.inventory, gs.playerBonusDamage);
           if (damage > 0) {
             enemy.takeDamage(damage);
             this.showDamageNumber(enemy.sprite.x, enemy.sprite.y - 20, damage);
@@ -897,7 +920,6 @@ export class AncientForestScene extends Phaser.Scene {
         // Handle journal page discovery
         if (pickup.def.itemId === 'aldric_journal_3') {
           gs.aldricJournal.discoverPage('aldric_journal_3');
-          EventBus.emit(Events.ITEM_ACQUIRED, { itemId: 'aldric_journal_3' });
         }
 
         return true;
@@ -937,6 +959,8 @@ export class AncientForestScene extends Phaser.Scene {
         // Return to village with zone prompt
         this.player.setVelocity(0, 0);
         this.showZonePrompt('Return to Thornwick Village?', () => {
+          const gs = GameState.get(this);
+          gs.ancientForestClearing = 0;
           this.cleanupEvents();
           this.scene.stop('HUDScene');
           this.cameras.main.fadeOut(400);
@@ -964,6 +988,8 @@ export class AncientForestScene extends Phaser.Scene {
     this.cameras.main.fadeOut(200);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       this.currentClearing = targetClearing;
+      const gs = GameState.get(this);
+      gs.ancientForestClearing = targetClearing;
       this.loadClearing();
 
       // Position player at opposite edge
@@ -1032,10 +1058,13 @@ export class AncientForestScene extends Phaser.Scene {
 
   private handlePlayerDeath(): void {
     this.combatSystem.resetHealth();
+    EventBus.emit(Events.SHOW_NOTIFICATION, { message: 'You have fallen... Returning to village.' });
+    if (this.inInventory) {
+      this.scene.stop('InventoryScene');
+      this.inInventory = false;
+    }
     this.cleanupEvents();
     this.scene.stop('HUDScene');
-
-    EventBus.emit(Events.SHOW_NOTIFICATION, 'You have fallen... Returning to village.');
 
     this.cameras.main.fadeOut(400);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {

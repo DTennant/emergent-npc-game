@@ -37,6 +37,7 @@ export class DungeonScene extends Phaser.Scene {
     D: Phaser.Input.Keyboard.Key;
   };
   private spaceKey!: Phaser.Input.Keyboard.Key;
+  private shiftKey!: Phaser.Input.Keyboard.Key;
   private escKey!: Phaser.Input.Keyboard.Key;
   private playerFacing = 'down';
   private currentRoom = 0;
@@ -51,6 +52,7 @@ export class DungeonScene extends Phaser.Scene {
   private dungeonCleared = false;
   private loadingRoom = false;
   private cleanedUp = false;
+  private invalidDungeon = false;
   private notificationText!: Phaser.GameObjects.Text;
   private notificationTimer = 0;
   private notificationHandler!: (data: string | { message?: string; text?: string }) => void;
@@ -64,17 +66,21 @@ export class DungeonScene extends Phaser.Scene {
   init(data: DungeonInitData): void {
     const def = DUNGEONS.find((d) => d.id === data.dungeonId);
     if (!def) {
+      this.invalidDungeon = true;
       this.scene.start('WoodsScene');
       return;
     }
+    this.invalidDungeon = false;
     this.dungeonDef = def;
     this.inventory = data.inventory;
     this.currentRoom = 0;
     this.dungeonCleared = false;
     this.cleanedUp = false;
+    this.loadingRoom = false;
   }
 
   create(): void {
+    if (this.invalidDungeon) return;
     this.cameras.main.setBackgroundColor(this.dungeonDef.bgColor);
     this.cameras.main.resetFX();
     this.cameras.main.fadeIn(500);
@@ -88,6 +94,8 @@ export class DungeonScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true);
 
     this.combatSystem = new CombatSystem(this, this.player);
+    const gs = GameState.get(this);
+    this.combatSystem.setMaxHealth(gs.getMaxHealth());
 
     this.playerHealthBar = new HealthBar(
       this,
@@ -95,7 +103,7 @@ export class DungeonScene extends Phaser.Scene {
       this.player.y - TILE_SIZE,
       TILE_SIZE,
       4,
-      PLAYER_MAX_HEALTH
+      gs.getMaxHealth()
     );
 
     this.wallGroup = this.physics.add.staticGroup();
@@ -109,6 +117,7 @@ export class DungeonScene extends Phaser.Scene {
       D: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
     this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
     this.roomLabel = this.add.text(10, 10, '', {
@@ -158,6 +167,10 @@ export class DungeonScene extends Phaser.Scene {
       this.handlePlayerAttack();
     });
 
+    this.shiftKey.on('down', () => {
+      this.combatSystem.dash(this.playerFacing);
+    });
+
     this.escKey.on('down', () => {
       this.exitDungeon();
     });
@@ -171,12 +184,16 @@ export class DungeonScene extends Phaser.Scene {
       for (const drop of data.drops) {
         this.inventory.addItem(drop.itemId, drop.quantity);
       }
+      const gs = GameState.get(this);
+      const xpAmount = data.entity.includes('Wolf') && data.entity.includes('Shadow') ? 100 :
+                       data.entity.includes('Golem') || data.entity.includes('Wraith') ? 100 :
+                       data.entity.includes('Ancient') ? 25 : 15;
+      gs.addXP(xpAmount);
     };
     EventBus.on(Events.ENTITY_DIED, this.entityDiedHandler);
 
     this.loadRoom(0);
 
-    const gs = GameState.get(this);
     gs.currentZone = 'dungeon';
     gs.storylineManager.discoverDungeon(this.dungeonDef.id);
   }
@@ -374,6 +391,7 @@ export class DungeonScene extends Phaser.Scene {
   private handlePlayerMovement(): void {
     this.combatSystem.update(this.game.loop.delta);
     if (this.combatSystem.isKnockedBack()) return;
+    if (this.combatSystem.isDashActive()) return;
 
     let dx = 0;
     let dy = 0;
@@ -415,7 +433,8 @@ export class DungeonScene extends Phaser.Scene {
         zone,
         target.sprite,
         () => {
-          const damage = this.combatSystem.getAttackDamage(this.inventory);
+          const gs = GameState.get(this);
+          const damage = this.combatSystem.getAttackDamage(this.inventory, gs.playerBonusDamage);
           if (damage > 0) {
             target.takeDamage(damage);
             this.showDamageNumber(target.sprite.x, target.sprite.y - 20, damage);
@@ -494,10 +513,10 @@ export class DungeonScene extends Phaser.Scene {
 
   private handlePlayerDeath(): void {
     this.combatSystem.resetHealth();
-    this.exitDungeon();
     EventBus.emit(Events.SHOW_NOTIFICATION, {
       message: 'You have fallen in the dungeon... Returning to village.',
     });
+    this.exitDungeon();
   }
 
   private exitDungeon(): void {

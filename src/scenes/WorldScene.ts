@@ -4,6 +4,7 @@ import { NPC_PERSONAS } from '../npc/personas';
 import { GossipSystem } from '../npc/GossipSystem';
 import { SaveManager } from '../persistence/SaveManager';
 import { BlightSystem } from '../world/BlightSystem';
+import { DayNightSystem } from '../world/DayNightSystem';
 import { EventBus, Events } from '../world/EventBus';
 import { GameState, NPCSaveState } from '../world/GameState';
 import { GossipPacket } from '../memory/types';
@@ -74,6 +75,7 @@ export class WorldScene extends Phaser.Scene {
   private playerHealthBar!: HealthBar;
   private playerFacing: string = 'down';
   private spaceKey!: Phaser.Input.Keyboard.Key;
+  private shiftKey!: Phaser.Input.Keyboard.Key;
   private blightSystem!: BlightSystem;
   private journalSprites: Map<string, Phaser.GameObjects.Rectangle> = new Map();
   private shrineZone!: Phaser.GameObjects.Rectangle;
@@ -85,6 +87,7 @@ export class WorldScene extends Phaser.Scene {
   private innMarkerListener: ((data: { npc: { persona: { id: string; name: string } } }) => void) | null = null;
   private buildingEntrances: { building: BuildingInterior; x: number; y: number; w: number; h: number; label: string }[] = [];
   private blightParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+  private dayNightSystem!: DayNightSystem;
 
   constructor() {
     super({ key: 'WorldScene' });
@@ -107,6 +110,7 @@ export class WorldScene extends Phaser.Scene {
     this.journalSprites = new Map();
     this.innMarker = null;
     this.innMarkerListener = null;
+    this.dayNightSystem = null!;
   }
 
   create(): void {
@@ -188,13 +192,14 @@ export class WorldScene extends Phaser.Scene {
     EventBus.on(Events.PLAYER_DIED, this.onPlayerDied, this);
 
     this.combatSystem = new CombatSystem(this, this.player);
+    this.combatSystem.setMaxHealth(gs.getMaxHealth());
     this.playerHealthBar = new HealthBar(
       this,
       this.player.x,
       this.player.y - TILE_SIZE,
       TILE_SIZE,
       4,
-      PLAYER_MAX_HEALTH
+      gs.getMaxHealth()
     );
 
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -207,6 +212,7 @@ export class WorldScene extends Phaser.Scene {
       I: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.I),
     };
     this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
 
     this.interactionPrompt = this.add.text(0, 0, '[E] Talk', {
       fontSize: fs(26),
@@ -294,6 +300,13 @@ export class WorldScene extends Phaser.Scene {
       this.handlePlayerAttack();
     });
 
+    this.shiftKey.on('down', () => {
+      if (this.inDialogue || this.transitioning || this.inCrafting || this.inInventory || this.inTrading) return;
+      this.combatSystem.dash(this.playerFacing);
+    });
+
+    this.dayNightSystem = new DayNightSystem(this);
+
     this.cameras.main.resetFX();
     this.cameras.main.fadeIn(400);
 
@@ -306,6 +319,7 @@ export class WorldScene extends Phaser.Scene {
 
     const gs = GameState.get(this);
     gs.worldState.update(delta);
+    this.dayNightSystem.update(gs.worldState.getHour());
     gs.playerPosition = { x: this.player.x, y: this.player.y };
 
     if (this.blightParticles) {
@@ -347,6 +361,9 @@ export class WorldScene extends Phaser.Scene {
     EventBus.off(Events.ITEM_ACQUIRED, this.onItemAcquired, this);
     EventBus.off(Events.PLAYER_DIED, this.onPlayerDied, this);
     this.destroyInnMarker();
+    if (this.dayNightSystem) {
+      this.dayNightSystem.destroy();
+    }
   }
 
   private onDayChange(data: { day: number }): void {
@@ -600,6 +617,7 @@ export class WorldScene extends Phaser.Scene {
   private handlePlayerMovement(): void {
     this.combatSystem.update(this.game.loop.delta);
     if (this.combatSystem.isKnockedBack()) return;
+    if (this.combatSystem.isDashActive()) return;
 
     let dx = 0;
     let dy = 0;
@@ -922,7 +940,9 @@ export class WorldScene extends Phaser.Scene {
       gs.inventory,
       { x: this.player.x, y: this.player.y },
       gs.currentZone,
-      gs.aldricJournal
+      gs.aldricJournal,
+      gs.ancientForestClearing,
+      { level: gs.playerLevel, xp: gs.playerXP, bonusDamage: gs.playerBonusDamage }
     );
   }
 
@@ -957,6 +977,17 @@ export class WorldScene extends Phaser.Scene {
 
     if (saveData.journal) {
       gs.aldricJournal.fromJSON(saveData.journal);
+    }
+
+    if (saveData.ancientForestClearing !== undefined) {
+      gs.ancientForestClearing = saveData.ancientForestClearing;
+    }
+
+    if (saveData.progression) {
+      gs.playerLevel = saveData.progression.level;
+      gs.playerXP = saveData.progression.xp;
+      gs.playerBonusDamage = saveData.progression.bonusDamage;
+      this.combatSystem.setMaxHealth(gs.getMaxHealth());
     }
 
     if (!this.spawnX || this.spawnX === GAME_WIDTH / 2) {
@@ -1167,7 +1198,7 @@ export class WorldScene extends Phaser.Scene {
 
   private startDialogue(npc: NPC): void {
     if (npc.isSleeping()) {
-      EventBus.emit(Events.SHOW_NOTIFICATION, { text: `${npc.persona.name} is sleeping...` });
+      EventBus.emit(Events.SHOW_NOTIFICATION, { message: `${npc.persona.name} is sleeping...` });
       return;
     }
     const gs = GameState.get(this);
@@ -1259,7 +1290,7 @@ export class WorldScene extends Phaser.Scene {
       this.player.clearTint();
     });
 
-    EventBus.emit(Events.SHOW_NOTIFICATION, 'You have fallen... Respawning at village.');
+    EventBus.emit(Events.SHOW_NOTIFICATION, { message: 'You have fallen... Respawning at village.' });
   }
 
   // --- Opening Story Overlay ---

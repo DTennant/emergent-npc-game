@@ -41,6 +41,8 @@ export const Events = {
   ENTITY_DAMAGED: 'combat:entity_damaged',
   ENTITY_DIED: 'combat:entity_died',
   PLAYER_DIED: 'combat:player_died',
+  XP_GAINED: 'combat:xp_gained',
+  LEVEL_UP: 'combat:level_up',
 
   // Quest events
   QUEST_PROGRESS: 'quest:progress',

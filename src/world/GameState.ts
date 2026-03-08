@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
 import { LLMClient } from '../ai/LLMClient';
 import { WorldState } from './WorldState';
+import { EventBus, Events } from './EventBus';
 import { Inventory } from '../inventory/Inventory';
 import { StorylineManager } from '../story/StorylineManager';
 import { AldricJournal } from '../story/AldricJournal';
+import { PLAYER_MAX_HEALTH } from '../config';
 import {
   EpisodicMemory,
   SemanticMemory,
@@ -37,6 +39,32 @@ export class GameState {
   currentZone: 'village' | 'woods' | 'dungeon' | 'ancient_forest' = 'village';
   playerPosition: { x: number; y: number } = { x: 640, y: 480 };
   initialized = false;
+  playerLevel = 1;
+  playerXP = 0;
+  playerBonusDamage = 0;
+  ancientForestClearing = 0;
+
+  addXP(amount: number): void {
+    this.playerXP += amount;
+    let xpNeeded = this.getXPForNextLevel();
+    EventBus.emit(Events.XP_GAINED, { xp: amount, totalXP: this.playerXP, level: this.playerLevel });
+
+    while (this.playerXP >= xpNeeded) {
+      this.playerXP -= xpNeeded;
+      this.playerLevel++;
+      this.playerBonusDamage++;
+      EventBus.emit(Events.LEVEL_UP, { level: this.playerLevel });
+      xpNeeded = this.getXPForNextLevel();
+    }
+  }
+
+  getXPForNextLevel(): number {
+    return this.playerLevel * 50;
+  }
+
+  getMaxHealth(): number {
+    return PLAYER_MAX_HEALTH + (this.playerLevel - 1) * 15;
+  }
 
   constructor() {
     this.llmClient = new LLMClient();
