@@ -221,6 +221,12 @@ export class InventoryScene extends Phaser.Scene {
     this.selectedIndex = index;
     const slot = items[index];
     const def = ITEMS[slot.itemId];
+    if (!def) {
+      this.descriptionText.setText('Unknown item (corrupted save).');
+      this.equipButton.setVisible(false);
+      this.useButton.setVisible(false);
+      return;
+    }
 
     const cell = this.itemCells[index];
     this.selectionHighlight.setPosition(cell.x, cell.y);
@@ -247,7 +253,7 @@ export class InventoryScene extends Phaser.Scene {
       this.equipButton.setVisible(false);
     }
 
-    const isUsable = def.type === 'consumable' && (def.id === 'health_potion' || def.id === 'provisions');
+    const isUsable = def.type === 'consumable';
     this.useButton.setVisible(isUsable);
   }
 
@@ -257,6 +263,7 @@ export class InventoryScene extends Phaser.Scene {
 
     const slot = items[this.selectedIndex];
     const def = ITEMS[slot.itemId];
+    if (!def) return;
     if (!def.equipSlot) return;
 
     const currentlyEquipped = this.inventory.getEquipped(def.equipSlot);
@@ -283,7 +290,11 @@ export class InventoryScene extends Phaser.Scene {
     const success = this.combatSystem.useConsumable(slot.itemId, this.inventory);
     if (success) {
       const def = ITEMS[slot.itemId];
-      EventBus.emit(Events.SHOW_NOTIFICATION, { message: `Used ${def.name}. Health restored!` });
+      if (def) {
+        EventBus.emit(Events.SHOW_NOTIFICATION, { message: `Used ${def.name}. Health restored!` });
+      } else {
+        EventBus.emit(Events.SHOW_NOTIFICATION, { message: 'Used item.' });
+      }
     } else {
       EventBus.emit(Events.SHOW_NOTIFICATION, { message: 'Health is already full!' });
     }
@@ -303,6 +314,9 @@ export class InventoryScene extends Phaser.Scene {
       if (i < items.length) {
         const slot = items[i];
         const def = ITEMS[slot.itemId];
+        if (!def) {
+          continue;
+        }
         const color = TYPE_COLORS[def.type] ?? 0x888888;
         this.itemCells[i].setFillStyle(color, 0.6);
         this.itemCells[i].setStrokeStyle(1, color);
@@ -321,8 +335,14 @@ export class InventoryScene extends Phaser.Scene {
       const itemId = equipped[slot];
       if (itemId) {
         const def = ITEMS[itemId];
+        if (!def) {
+          this.equippedTexts[slot].setText('(invalid item)');
+          this.equippedTexts[slot].setColor('#666666');
+          continue;
+        }
         let label = def.name;
         if (def.stats?.damage) label += ` (dmg: ${def.stats.damage})`;
+        if (def.stats?.defense) label += ` (def: ${def.stats.defense})`;
         this.equippedTexts[slot].setText(label);
         this.equippedTexts[slot].setColor('#ffffff');
       } else {

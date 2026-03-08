@@ -88,6 +88,15 @@ export class QuestGateChecker {
     return QUEST_GATES.filter((g) => g.npcId === npcId);
   }
 
+  static getNPCDungeonId(npcId: string): string | null {
+    const mapping: Record<string, string> = {
+      'blacksmith_erik': 'abandoned_mine',
+      'herbalist_willow': 'forest_cave',
+      'guard_marcus': 'ruined_tower',
+    };
+    return mapping[npcId] ?? null;
+  }
+
   static getGateStatus(
     npcId: string,
     questId: string,
