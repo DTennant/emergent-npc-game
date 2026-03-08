@@ -91,6 +91,19 @@ export class WorldScene extends Phaser.Scene {
   init(data?: WorldSceneInitData): void {
     this.spawnX = data?.spawnX ?? GAME_WIDTH / 2;
     this.spawnY = data?.spawnY ?? GAME_HEIGHT / 2;
+    this.transitioning = false;
+    this.inDialogue = false;
+    this.inInventory = false;
+    this.inCrafting = false;
+    this.inTrading = false;
+    this.nearestNPC = null;
+    this.npcs = [];
+    this.itemPickups = [];
+    this.buildingEntrances = [];
+    this.gossipTracker = new Map();
+    this.journalSprites = new Map();
+    this.innMarker = null;
+    this.innMarkerListener = null;
   }
 
   create(): void {

@@ -71,6 +71,11 @@ export class WoodsScene extends Phaser.Scene {
   init(data?: WoodsSceneInitData): void {
     this.spawnX = data?.spawnX ?? 60;
     this.spawnY = data?.spawnY ?? GAME_HEIGHT / 2;
+    this.transitioning = false;
+    this.inInventory = false;
+    this.enemies = [];
+    this.dungeonEntranceZones = [];
+    this.itemPickups = [];
   }
 
   create(): void {
