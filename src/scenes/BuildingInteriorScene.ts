@@ -508,10 +508,10 @@ export class BuildingInteriorScene extends Phaser.Scene {
 
   private exitBuilding(): void {
     this.saveNPCState();
-    this.scene.stop('HUDScene');
-    this.cleanup();
     this.cameras.main.fadeOut(300);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      this.scene.stop('HUDScene');
+      this.cleanup();
       EventBus.emit(Events.BUILDING_EXIT, { buildingId: this.building.id });
       this.scene.start(this.returnScene, {
         spawnX: this.returnX,
