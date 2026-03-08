@@ -9,9 +9,12 @@ import { CraftingScene } from './scenes/CraftingScene';
 import { TradeScene } from './scenes/TradeScene';
 import { DungeonScene } from './scenes/DungeonScene';
 import { WoodsScene } from './scenes/WoodsScene';
+import { AncientForestScene } from './scenes/AncientForestScene';
 import { SettingsScene } from './scenes/SettingsScene';
 import { BuildingInteriorScene } from './scenes/BuildingInteriorScene';
 import { DebugOverlayScene } from './scenes/DebugOverlayScene';
+import { QuestJournalScene } from './scenes/QuestJournalScene';
+import { VictoryScene } from './scenes/VictoryScene';
 import { DebugManager } from './debug/DebugManager';
 import { GAME_WIDTH, GAME_HEIGHT } from './config';
 
@@ -44,7 +47,7 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true,
   },
-  scene: [LoginScene, BootScene, WorldScene, WoodsScene, DialogueScene, HUDScene, InventoryScene, CraftingScene, TradeScene, DungeonScene, SettingsScene, BuildingInteriorScene, DebugOverlayScene],
+  scene: [LoginScene, BootScene, WorldScene, WoodsScene, AncientForestScene, DialogueScene, HUDScene, InventoryScene, CraftingScene, TradeScene, DungeonScene, SettingsScene, BuildingInteriorScene, DebugOverlayScene, QuestJournalScene, VictoryScene],
 };
 
 const game = new Phaser.Game(config);

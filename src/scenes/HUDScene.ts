@@ -3,7 +3,8 @@ import { WorldState } from '../world/WorldState';
 import { LLMClient } from '../ai/LLMClient';
 import { ITEMS } from '../inventory/types';
 import { EventBus, Events } from '../world/EventBus';
-import { GAME_WIDTH, GAME_HEIGHT, fs, fsn } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT, NPC_COLORS, fs, fsn } from '../config';
+import { GameState } from '../world/GameState';
 
 interface HUDData {
   worldState: WorldState;
@@ -24,7 +25,17 @@ export class HUDScene extends Phaser.Scene {
   private shownHints: Set<string> = new Set();
   private questTrackerText!: Phaser.GameObjects.Text;
   private helpKey!: Phaser.Input.Keyboard.Key;
+  private minimapKey!: Phaser.Input.Keyboard.Key;
   private barHeight = 48;
+
+  // Minimap
+  private minimapContainer!: Phaser.GameObjects.Container;
+  private minimapPlayerDot!: Phaser.GameObjects.Arc;
+  private minimapZoneElements: Phaser.GameObjects.GameObject[] = [];
+  private currentMinimapZone = '';
+  private minimapVisible = true;
+  private static readonly MM_W = 160;
+  private static readonly MM_H = 120;
 
   constructor() {
     super({ key: 'HUDScene' });
@@ -125,7 +136,7 @@ export class HUDScene extends Phaser.Scene {
     this.notificationText.setVisible(false);
 
     this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT - 10, 'WASD: Move | E: Talk | I: Inv | C: Craft | T: Trade | H: Help', {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT - 10, 'WASD: Move | E: Talk | I: Inv | C: Craft | T: Trade | M: Map | H: Help', {
         fontSize: fs(22),
         color: '#666666',
         stroke: '#000000',
@@ -134,6 +145,8 @@ export class HUDScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 1)
       .setDepth(101);
+
+    this.createMinimap();
 
     EventBus.on(Events.SHOW_NOTIFICATION, this.onShowNotification, this);
     EventBus.on(Events.DIALOGUE_START, this.onDialogueStart, this);
@@ -147,6 +160,8 @@ export class HUDScene extends Phaser.Scene {
 
     this.helpKey = this.input.keyboard!.addKey('H');
     this.helpKey.on('down', () => this.toggleHelp());
+    this.minimapKey = this.input.keyboard!.addKey('M');
+    this.minimapKey.on('down', () => this.toggleMinimap());
     this.createHelpPanel();
 
     this.time.delayedCall(2000, () => {
@@ -175,6 +190,8 @@ export class HUDScene extends Phaser.Scene {
         this.notificationText.setVisible(false);
       }
     }
+
+    this.updateMinimap();
   }
 
   shutdown(): void {
@@ -190,12 +207,16 @@ export class HUDScene extends Phaser.Scene {
     if (this.helpKey) {
       this.helpKey.removeAllListeners();
     }
+    if (this.minimapKey) {
+      this.minimapKey.removeAllListeners();
+    }
   }
 
   private onShowNotification(data: string | { message?: string; text?: string }): void {
     if (typeof data === 'string') {
       this.showNotification(data);
     } else {
+      // handles both `message` and `text` field variants from different event emitters
       this.showNotification(data.message ?? data.text ?? '');
     }
   }
@@ -305,25 +326,27 @@ export class HUDScene extends Phaser.Scene {
 
   private updateQuestTracker(): void {
     if (!this.worldState) return;
-    
+
+    const gs = GameState.get(this);
+    if (!gs) return;
+    const s = gs.storylineManager;
+
     let text = 'Current Objective:\n';
-    const s = this.worldState.storylineData;
-    if (!s) return;
 
     if (s.shrineActivated) {
         text += '✓ Shrine Activated!\nThe Blight is sealed.';
         this.questTrackerText.setColor('#44ff44');
-    } else if (s.runestoneStatus && Object.values(s.runestoneStatus).filter(v => v).length === 3) {
+    } else if (s.canActivateShrine()) {
         text += 'Bring Runestones to\nthe Shrine of Dawn';
         this.questTrackerText.setColor('#ffd700');
     } else if (s.blightAwareness) {
-        const count = s.runestoneStatus ? Object.values(s.runestoneStatus).filter(v => v).length : 0;
+        const count = s.getRunestoneCount();
         text += `Find Runestones (${count}/3)\n`;
-        
-        if (!s.runestoneStatus?.forest_cave) text += '- Forest Cave (Needs Lantern)\n';
-        if (!s.runestoneStatus?.abandoned_mine) text += '- Mine (Needs Rope)\n';
-        if (!s.runestoneStatus?.ruined_tower) text += '- Tower (Needs Blade)';
-        
+
+        if (!s.runestoneStatus.forest_cave?.runestoneObtained) text += '- Forest Cave (Needs Lantern)\n';
+        if (!s.runestoneStatus.abandoned_mine?.runestoneObtained) text += '- Mine (Needs Rope)\n';
+        if (!s.runestoneStatus.ruined_tower?.runestoneObtained) text += '- Tower (Needs Blade)';
+
         this.questTrackerText.setColor('#ffffff');
     } else {
         text += 'Explore Thornwick Village\n\u2022 Pick up items (E key)\n\u2022 Talk to villagers\n\u2022 Find Aldric\'s journal pages';
@@ -331,6 +354,190 @@ export class HUDScene extends Phaser.Scene {
     }
 
     this.questTrackerText.setText(text);
+  }
+
+  // --- Minimap ---
+
+  private createMinimap(): void {
+    const mmX = GAME_WIDTH - HUDScene.MM_W - 10;
+    const mmY = GAME_HEIGHT - HUDScene.MM_H - 20;
+
+    this.minimapContainer = this.add.container(mmX, mmY);
+    this.minimapContainer.setDepth(101);
+
+    const bg = this.add.rectangle(
+      HUDScene.MM_W / 2, HUDScene.MM_H / 2,
+      HUDScene.MM_W, HUDScene.MM_H,
+      0x111122, 0.8
+    );
+    bg.setStrokeStyle(1, 0x4488ff);
+    this.minimapContainer.add(bg);
+
+    const label = this.add.text(HUDScene.MM_W / 2, -8, '[M] Map', {
+      fontSize: fs(18),
+      color: '#4488ff',
+      stroke: '#000000',
+      strokeThickness: 1,
+      resolution: window.devicePixelRatio,
+    });
+    label.setOrigin(0.5, 1);
+    this.minimapContainer.add(label);
+
+    this.minimapPlayerDot = this.add.circle(
+      HUDScene.MM_W / 2, HUDScene.MM_H / 2, 3, 0xffffff
+    );
+    this.minimapPlayerDot.setDepth(1);
+    this.minimapContainer.add(this.minimapPlayerDot);
+  }
+
+  private toggleMinimap(): void {
+    this.minimapVisible = !this.minimapVisible;
+    this.minimapContainer.setVisible(this.minimapVisible);
+  }
+
+  private updateMinimap(): void {
+    if (!this.minimapVisible) return;
+
+    const gs = GameState.get(this);
+    if (!gs) return;
+
+    if (gs.currentZone !== this.currentMinimapZone) {
+      this.rebuildMinimapForZone(gs.currentZone);
+      this.currentMinimapZone = gs.currentZone;
+    }
+
+    const scaleX = HUDScene.MM_W / GAME_WIDTH;
+    const scaleY = HUDScene.MM_H / GAME_HEIGHT;
+    this.minimapPlayerDot.setPosition(
+      gs.playerPosition.x * scaleX,
+      gs.playerPosition.y * scaleY
+    );
+  }
+
+  private rebuildMinimapForZone(zone: string): void {
+    for (const el of this.minimapZoneElements) {
+      el.destroy();
+    }
+    this.minimapZoneElements = [];
+
+    const scaleX = HUDScene.MM_W / GAME_WIDTH;
+    const scaleY = HUDScene.MM_H / GAME_HEIGHT;
+
+    if (zone === 'village') {
+      this.buildVillageMinimap(scaleX, scaleY);
+    } else if (zone === 'woods') {
+      this.buildWoodsMinimap(scaleX, scaleY);
+    } else if (zone === 'dungeon') {
+      this.buildDungeonMinimap();
+    } else {
+      this.buildGenericMinimap(zone);
+    }
+  }
+
+  private buildVillageMinimap(sx: number, sy: number): void {
+    const buildings: { x: number; y: number; w: number; h: number; color: number }[] = [
+      { x: 368, y: 288, w: 80, h: 60, color: 0xcc4400 },
+      { x: 704, y: 288, w: 90, h: 70, color: 0xbb8844 },
+      { x: 592, y: 464, w: 70, h: 50, color: 0x6644aa },
+      { x: 1024, y: 688, w: 100, h: 60, color: 0x558833 },
+      { x: 160, y: 560, w: 60, h: 50, color: 0x666688 },
+      { x: 800, y: 160, w: 70, h: 50, color: 0x339966 },
+    ];
+
+    for (const b of buildings) {
+      const rect = this.add.rectangle(
+        b.x * sx, b.y * sy,
+        Math.max(b.w * sx, 4), Math.max(b.h * sy, 3),
+        b.color, 0.9
+      );
+      this.minimapContainer.add(rect);
+      this.minimapZoneElements.push(rect);
+    }
+
+    const shrine = this.add.circle(640 * sx, 96 * sy, 2, 0xffd700);
+    this.minimapContainer.add(shrine);
+    this.minimapZoneElements.push(shrine);
+
+    const npcPositions: { x: number; y: number; id: string }[] = [
+      { x: 368, y: 288, id: 'blacksmith_erik' },
+      { x: 704, y: 288, id: 'innkeeper_rose' },
+      { x: 592, y: 464, id: 'merchant_anna' },
+      { x: 1024, y: 688, id: 'farmer_thomas' },
+      { x: 160, y: 560, id: 'guard_marcus' },
+      { x: 800, y: 160, id: 'herbalist_willow' },
+    ];
+
+    for (const npc of npcPositions) {
+      const color = NPC_COLORS[npc.id] ?? 0xaaaaaa;
+      const dot = this.add.circle(npc.x * sx, npc.y * sy, 2, color);
+      this.minimapContainer.add(dot);
+      this.minimapZoneElements.push(dot);
+    }
+
+    const exitLine = this.add.rectangle(
+      HUDScene.MM_W - 1, HUDScene.MM_H / 2,
+      2, 20, 0x44ff44
+    );
+    this.minimapContainer.add(exitLine);
+    this.minimapZoneElements.push(exitLine);
+    this.tweens.add({
+      targets: exitLine,
+      alpha: { from: 0.3, to: 1.0 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  private buildWoodsMinimap(sx: number, sy: number): void {
+    const entrances: { x: number; y: number; color: number }[] = [
+      { x: 1200, y: 300, color: 0x1a3a0a },
+      { x: 1100, y: 800, color: 0x3a3a3a },
+      { x: 800, y: 150, color: 0x3a0a3a },
+    ];
+
+    for (const ent of entrances) {
+      const dot = this.add.circle(ent.x * sx, ent.y * sy, 3, ent.color);
+      dot.setStrokeStyle(1, 0xffffff, 0.5);
+      this.minimapContainer.add(dot);
+      this.minimapZoneElements.push(dot);
+    }
+
+    const exitLine = this.add.rectangle(
+      1, HUDScene.MM_H / 2,
+      2, 20, 0x44ff44
+    );
+    this.minimapContainer.add(exitLine);
+    this.minimapZoneElements.push(exitLine);
+    this.tweens.add({
+      targets: exitLine,
+      alpha: { from: 0.3, to: 1.0 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  private buildDungeonMinimap(): void {
+    const label = this.add.text(HUDScene.MM_W / 2, HUDScene.MM_H / 2 - 10, 'Dungeon', {
+      fontSize: fs(20),
+      color: '#ff6644',
+      resolution: window.devicePixelRatio,
+    });
+    label.setOrigin(0.5);
+    this.minimapContainer.add(label);
+    this.minimapZoneElements.push(label);
+  }
+
+  private buildGenericMinimap(zone: string): void {
+    const label = this.add.text(HUDScene.MM_W / 2, HUDScene.MM_H / 2 - 10, zone.replace('_', ' '), {
+      fontSize: fs(20),
+      color: '#88aaff',
+      resolution: window.devicePixelRatio,
+    });
+    label.setOrigin(0.5);
+    this.minimapContainer.add(label);
+    this.minimapZoneElements.push(label);
   }
 
   private toggleHelp(): void {
