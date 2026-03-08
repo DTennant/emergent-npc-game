@@ -209,6 +209,15 @@ export class BuildingInteriorScene extends Phaser.Scene {
       }
     });
 
+    this.input.keyboard!.addKey('J').on('down', () => {
+      if (this.inDialogue) return;
+      if (this.scene.isActive('QuestJournalScene')) {
+        this.scene.stop('QuestJournalScene');
+      } else {
+        this.scene.launch('QuestJournalScene');
+      }
+    });
+
     this.input.keyboard!.addKey('T').on('down', () => {
       if (this.inTrading) {
         this.scene.stop('TradeScene');
@@ -415,6 +424,10 @@ export class BuildingInteriorScene extends Phaser.Scene {
 
   private startDialogue(): void {
     if (!this.npc) return;
+    if (this.npc.isSleeping()) {
+      EventBus.emit(Events.SHOW_NOTIFICATION, { text: `${this.npc.persona.name} is sleeping...` });
+      return;
+    }
     const gs = GameState.get(this);
     const npc = this.npc;
     this.inDialogue = true;
@@ -489,7 +502,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
     this.scene.stop('HUDScene');
     this.cleanup();
     this.cameras.main.fadeOut(300);
-    this.time.delayedCall(300, () => {
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       EventBus.emit(Events.BUILDING_EXIT, { buildingId: this.building.id });
       this.scene.start(this.returnScene, {
         spawnX: this.returnX,
