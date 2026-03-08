@@ -31,6 +31,17 @@ export const INVINCIBILITY_MS = 250;
 export const GOSSIP_RANGE = TILE_SIZE * 4;
 export const GOSSIP_INTERVAL_MS = 10000;
 
+export const GUARD_PATROL_WAYPOINTS: { x: number; y: number }[] = [
+  { x: 100, y: 100 },
+  { x: 640, y: 80 },
+  { x: 1180, y: 100 },
+  { x: 1180, y: 860 },
+  { x: 640, y: 880 },
+  { x: 100, y: 860 },
+  { x: 100, y: 480 },
+];
+export const PATROL_PAUSE_MS = 2500;
+
 // Blight constants
 export const BLIGHT_BASE_INTENSITY = 0.1;
 export const BLIGHT_DAILY_INCREASE = 0.02;

@@ -3,6 +3,15 @@ import { GossipPacket } from '../memory/types';
 import { EventBus, Events } from '../world/EventBus';
 import { GOSSIP_RANGE, GOSSIP_INTERVAL_MS } from '../config';
 
+const TOPIC_KEYWORDS: Record<string, string[]> = {
+  'blacksmith_erik': ['forge', 'metal', 'weapon', 'sword', 'armor', 'iron', 'craft', 'fight', 'combat'],
+  'innkeeper_rose': ['village', 'gossip', 'rumor', 'visitor', 'social', 'news', 'story', 'friend'],
+  'merchant_anna': ['trade', 'gold', 'price', 'buy', 'sell', 'merchant', 'goods', 'rare', 'material'],
+  'farmer_thomas': ['farm', 'crop', 'harvest', 'weather', 'food', 'provision', 'land', 'grow'],
+  'guard_marcus': ['patrol', 'danger', 'wolf', 'blight', 'protect', 'guard', 'threat', 'forest', 'attack'],
+  'herbalist_willow': ['herb', 'potion', 'plant', 'moonpetal', 'heal', 'nature', 'forest', 'brew'],
+};
+
 export class GossipSystem {
   private npcs: NPC[];
   private timer = 0;
@@ -48,8 +57,17 @@ export class GossipSystem {
     const pairKey = `${sender.persona.id}->${receiver.persona.id}`;
     const shared = this.sharedMemories.get(pairKey) ?? new Set<string>();
 
-    const unshard = memories.find((m) => !shared.has(m.id));
-    if (!unshard) return;
+    const unsharedMemories = memories.filter((m) => !shared.has(m.id));
+    if (unsharedMemories.length === 0) return;
+
+    const keywords = TOPIC_KEYWORDS[receiver.persona.id] || [];
+    const scored = unsharedMemories.map(m => {
+      const content = m.summary.toLowerCase();
+      const score = keywords.reduce((s, kw) => s + (content.includes(kw) ? 1 : 0), 0);
+      return { memory: m, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const unshard = scored[0].memory;
 
     shared.add(unshard.id);
     this.sharedMemories.set(pairKey, shared);
@@ -81,6 +99,7 @@ export class GossipSystem {
     const relationship = sender.memory.getRelationship(receiver.persona.id);
     const trustBonus = relationship.trust * 0.4;
 
-    return Math.min(1, 0.1 + extraversionBonus + trustBonus);
+    const moodMod = sender.getMoodModifier();
+    return Math.min(1, (0.1 + extraversionBonus + trustBonus) * moodMod);
   }
 }
