@@ -34,7 +34,7 @@ export class GameState {
   storylineManager: StorylineManager;
   aldricJournal: AldricJournal;
   npcData: Map<string, NPCSaveState> = new Map();
-  currentZone: 'village' | 'woods' | 'dungeon' = 'village';
+  currentZone: 'village' | 'woods' | 'dungeon' | 'ancient_forest' = 'village';
   playerPosition: { x: number; y: number } = { x: 640, y: 480 };
   initialized = false;
 

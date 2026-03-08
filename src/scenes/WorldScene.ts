@@ -62,6 +62,7 @@ export class WorldScene extends Phaser.Scene {
   private inInventory = false;
   private inCrafting = false;
   private inTrading = false;
+  private inJournal = false;
   private transitioning = false;
   private interactionPrompt!: Phaser.GameObjects.Text;
   private nearestNPC: NPC | null = null;
@@ -83,6 +84,7 @@ export class WorldScene extends Phaser.Scene {
   private innMarker: Phaser.GameObjects.Text | null = null;
   private innMarkerListener: ((data: { npc: { persona: { id: string; name: string } } }) => void) | null = null;
   private buildingEntrances: { building: BuildingInterior; x: number; y: number; w: number; h: number; label: string }[] = [];
+  private blightParticles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
 
   constructor() {
     super({ key: 'WorldScene' });
@@ -96,6 +98,7 @@ export class WorldScene extends Phaser.Scene {
     this.inInventory = false;
     this.inCrafting = false;
     this.inTrading = false;
+    this.inJournal = false;
     this.nearestNPC = null;
     this.npcs = [];
     this.itemPickups = [];
@@ -116,6 +119,27 @@ export class WorldScene extends Phaser.Scene {
     this.blightSystem = new BlightSystem(this);
 
     this.createShrineOfDawn();
+
+    // Create blight ambient particle emitter (initially not emitting)
+    if (this.textures.exists('particle_circle')) {
+      this.blightParticles = this.add.particles(0, 0, 'particle_circle', {
+        emitting: false,
+        lifespan: { min: 2000, max: 4000 },
+        frequency: 200,
+        quantity: 1,
+        speed: { min: 5, max: 20 },
+        angle: { min: 250, max: 290 },
+        scale: { start: 0.3, end: 1.0 },
+        alpha: { start: 0.6, end: 0 },
+        tint: [0x8800ff, 0x6600cc, 0x440088],
+        blendMode: Phaser.BlendModes.ADD,
+        emitZone: {
+          type: 'random',
+          source: new Phaser.Geom.Rectangle(GAME_WIDTH * 0.6, 0, GAME_WIDTH * 0.4, GAME_HEIGHT),
+        } as Phaser.Types.GameObjects.Particles.EmitZoneData,
+      });
+      this.blightParticles.setDepth(8);
+    }
 
     this.player = this.physics.add.sprite(this.spawnX, this.spawnY, TextureKeys.PLAYER);
     this.player.setDepth(10);
@@ -229,6 +253,20 @@ export class WorldScene extends Phaser.Scene {
       }
     });
 
+    this.input.keyboard!.addKey('J').on('down', () => {
+      if (this.inDialogue || this.transitioning) return;
+      if (this.inJournal) {
+        this.scene.stop('QuestJournalScene');
+        this.inJournal = false;
+      } else {
+        this.inJournal = true;
+        this.scene.launch('QuestJournalScene');
+        this.scene.get('QuestJournalScene').events.once('shutdown', () => {
+          this.inJournal = false;
+        });
+      }
+    });
+
     this.input.keyboard!.addKey('C').on('down', () => {
       if (this.inDialogue || this.transitioning || this.inTrading || this.inInventory) return;
       if (this.inCrafting) {
@@ -268,6 +306,18 @@ export class WorldScene extends Phaser.Scene {
 
     const gs = GameState.get(this);
     gs.worldState.update(delta);
+    gs.playerPosition = { x: this.player.x, y: this.player.y };
+
+    if (this.blightParticles) {
+      const intensity = this.blightSystem?.getIntensity() ?? 0;
+      if (intensity > 0.2) {
+        this.blightParticles.emitting = true;
+        this.blightParticles.frequency = Math.max(50, 500 - intensity * 450);
+        this.blightParticles.quantity = Math.ceil(intensity * 3);
+      } else {
+        this.blightParticles.emitting = false;
+      }
+    }
 
     this.handlePlayerMovement();
 
@@ -319,6 +369,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private onItemAcquired(data: { itemId: string }): void {
+    this.cameras.main.flash(200, 255, 255, 255, false);
     const gs = GameState.get(this);
     if (data.itemId.startsWith('aldric_journal_') && !gs.storylineManager.blightAwareness) {
       gs.storylineManager.discoverBlight();
@@ -469,6 +520,23 @@ export class WorldScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
     });
+
+    const northExitHint = this.add.text(GAME_WIDTH / 2, 50, '\u2191 Ancient Forest', {
+      fontSize: fs(24),
+      color: '#aaffaa',
+      stroke: '#000000',
+      strokeThickness: 2,
+      resolution: window.devicePixelRatio,
+    });
+    northExitHint.setOrigin(0.5, 0.5);
+    northExitHint.setDepth(15);
+    this.tweens.add({
+      targets: northExitHint,
+      alpha: { from: 0.4, to: 1.0 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+    });
   }
 
   private addGentleDecoration(): void {
@@ -530,6 +598,9 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private handlePlayerMovement(): void {
+    this.combatSystem.update(this.game.loop.delta);
+    if (this.combatSystem.isKnockedBack()) return;
+
     let dx = 0;
     let dy = 0;
 
@@ -623,7 +694,7 @@ export class WorldScene extends Phaser.Scene {
         this.cleanupEvents();
         this.scene.stop('HUDScene');
         this.cameras.main.fadeOut(400);
-        this.time.delayedCall(400, () => {
+        this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
           this.scene.start('WoodsScene', {
             spawnX: 60,
             spawnY: this.player.y,
@@ -631,9 +702,25 @@ export class WorldScene extends Phaser.Scene {
         });
       });
     }
+    if (this.player.y < 40) {
+      this.player.setVelocity(0, 0);
+      this.showZonePrompt('Enter the Ancient Forest?', () => {
+        this.saveNPCState();
+        this.saveGame();
+        this.cleanupEvents();
+        this.scene.stop('HUDScene');
+        this.cameras.main.fadeOut(400);
+        this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+          this.scene.start('AncientForestScene', {
+            spawnX: GAME_WIDTH / 2,
+            spawnY: GAME_HEIGHT - 60,
+          });
+        });
+      }, { x: this.player.x, y: 80 });
+    }
   }
 
-  private showZonePrompt(message: string, onConfirm: () => void): void {
+  private showZonePrompt(message: string, onConfirm: () => void, cancelPosition?: { x: number; y: number }): void {
     this.transitioning = true;
     const bg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 400, 150, 0x000000, 0.85);
     bg.setDepth(200);
@@ -670,7 +757,8 @@ export class WorldScene extends Phaser.Scene {
     nKey.once('down', () => {
       cleanup();
       this.transitioning = false;
-      this.player.setPosition(GAME_WIDTH - 80, this.player.y);
+      const pos = cancelPosition ?? { x: GAME_WIDTH - 80, y: this.player.y };
+      this.player.setPosition(pos.x, pos.y);
     });
   }
 
@@ -813,7 +901,7 @@ export class WorldScene extends Phaser.Scene {
     this.cleanupEvents();
     this.scene.stop('HUDScene');
     this.cameras.main.fadeOut(400);
-    this.time.delayedCall(400, () => {
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       this.scene.start('BuildingInteriorScene', {
         buildingId: entrance.building.id,
         returnScene: 'WorldScene',
@@ -833,7 +921,8 @@ export class WorldScene extends Phaser.Scene {
       this.npcs,
       gs.inventory,
       { x: this.player.x, y: this.player.y },
-      gs.currentZone
+      gs.currentZone,
+      gs.aldricJournal
     );
   }
 
@@ -864,6 +953,10 @@ export class WorldScene extends Phaser.Scene {
 
     if (saveData.world.storyline) {
       gs.storylineManager.fromJSON(saveData.world.storyline);
+    }
+
+    if (saveData.journal) {
+      gs.aldricJournal.fromJSON(saveData.journal);
     }
 
     if (!this.spawnX || this.spawnX === GAME_WIDTH / 2) {
@@ -962,6 +1055,22 @@ export class WorldScene extends Phaser.Scene {
       EventBus.emit(Events.SHOW_NOTIFICATION, {
         message: 'The Shrine of Dawn blazes with golden light! The Blight is sealed forever!',
       });
+
+      for (const npc of this.npcs) {
+        npc.boostMood(0.3);
+      }
+
+      gs.worldState.villageMemory.addEvent({
+        description: 'The Shrine of Dawn was activated and the Blight was sealed forever.',
+        day: gs.worldState.getDay(),
+        knownBy: ['player'],
+        impact: 'positive',
+        category: 'world_event',
+      });
+
+      this.time.delayedCall(500, () => {
+        this.scene.launch('VictoryScene');
+      });
     } else {
       const count = gs.storylineManager.getRunestoneCount();
       EventBus.emit(Events.SHOW_NOTIFICATION, {
@@ -1057,6 +1166,10 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private startDialogue(npc: NPC): void {
+    if (npc.isSleeping()) {
+      EventBus.emit(Events.SHOW_NOTIFICATION, { text: `${npc.persona.name} is sleeping...` });
+      return;
+    }
     const gs = GameState.get(this);
     this.inDialogue = true;
     npc.isInDialogue = true;
