@@ -240,6 +240,7 @@ export class HUDScene extends Phaser.Scene {
   }
 
   private onShowNotification(data: string | { message?: string; text?: string }): void {
+    if (!this.scene.isActive()) return;
     if (typeof data === 'string') {
       this.showNotification(data);
     } else {
@@ -249,11 +250,13 @@ export class HUDScene extends Phaser.Scene {
   }
 
   private onDialogueStart(data: { npc: { persona: { name: string } } }): void {
+    if (!this.scene.isActive()) return;
     this.showNotification(`Speaking with ${data.npc.persona.name}...`);
     this.showHint('dialogue', 'Build trust by having more conversations. NPCs share knowledge as trust grows.');
   }
 
   private onInventoryChange(data: { equipped: Record<string, string | null> }): void {
+    if (!this.scene.isActive() || !this.equippedWeaponText?.active) return;
     const weaponId = data.equipped.weapon;
     if (weaponId && ITEMS[weaponId]) {
       const def = ITEMS[weaponId];
@@ -267,6 +270,7 @@ export class HUDScene extends Phaser.Scene {
   }
 
   private onItemAcquired(data: { itemId: string; quantity: number }): void {
+    if (!this.scene.isActive()) return;
     const def = ITEMS[data.itemId];
     if (def) {
       const qtyStr = data.quantity > 1 ? ` x${data.quantity}` : '';
@@ -277,32 +281,39 @@ export class HUDScene extends Phaser.Scene {
   }
 
   private onPlayerAttack(): void {
+    if (!this.scene.isActive()) return;
     this.showHint('combat', 'Press SPACE to attack! Watch your health bar.');
   }
 
   private onItemCrafted(): void {
+    if (!this.scene.isActive()) return;
     this.showHint('crafting_success', 'Item crafted! Visit the Forge for advanced recipes.');
   }
 
   private onTradeComplete(): void {
+    if (!this.scene.isActive()) return;
     this.showHint('trading', 'Trade with NPCs using T. Build trust for better prices and rare items.');
   }
 
   private onQuestProgress(): void {
+    if (!this.scene.isActive()) return;
     this.updateQuestTracker();
   }
 
   private onEntityDamaged(data: { entity: string; currentHealth: number; maxHealth: number }): void {
+    if (!this.scene.isActive()) return;
     if (data.entity === 'player' && data.currentHealth < data.maxHealth * 0.3) {
       this.showHint('low_health', 'Your health is low! Find safety or eat provisions.');
     }
   }
 
   private onXPGained(_data: { xp: number; totalXP: number; level: number }): void {
+    if (!this.scene.isActive()) return;
     this.updateLevelDisplay();
   }
 
   private onLevelUp(data: { level: number }): void {
+    if (!this.scene.isActive()) return;
     this.updateLevelDisplay();
     this.cameras.main.flash(300, 68, 255, 68);
     EventBus.emit(Events.SHOW_NOTIFICATION, { message: `Level Up! You are now level ${data.level}!` });

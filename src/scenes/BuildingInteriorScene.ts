@@ -510,9 +510,13 @@ export class BuildingInteriorScene extends Phaser.Scene {
     this.saveNPCState();
     this.cameras.main.fadeOut(300);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.stop('HUDScene');
-      this.cleanup();
-      EventBus.emit(Events.BUILDING_EXIT, { buildingId: this.building.id });
+      try {
+        this.cleanup();
+        EventBus.emit(Events.BUILDING_EXIT, { buildingId: this.building.id });
+      } catch (e) {
+        console.error('BuildingInteriorScene exit cleanup error:', e);
+      }
+      // Don't stop HUDScene here — WorldScene relaunches it in create()
       this.scene.start(this.returnScene, {
         spawnX: this.returnX,
         spawnY: this.returnY,
