@@ -123,6 +123,7 @@ export class LoginScene extends Phaser.Scene {
     this.domElements.push(inputDom);
 
     this.usernameInput.addEventListener('keydown', (e: KeyboardEvent) => {
+      e.stopPropagation();
       if (e.key === 'Enter') {
         this.startGame();
       }
@@ -231,5 +232,8 @@ export class LoginScene extends Phaser.Scene {
 
   shutdown(): void {
     this.cleanupInputs();
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
   }
 }

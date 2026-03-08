@@ -164,6 +164,7 @@ export class SettingsScene extends Phaser.Scene {
         if (document.activeElement instanceof HTMLElement) {
           document.activeElement.blur();
         }
+        EventBus.emit(Events.SETTINGS_CLOSE);
         this.scene.restart({ onClose: this.onClose });
       });
     }

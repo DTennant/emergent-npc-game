@@ -242,12 +242,15 @@ export class DialogueScene extends Phaser.Scene {
   private cleanup(): void {
     if (this.inputDom) {
       this.inputDom.destroy();
+      this.inputDom = null!;
     }
     if (this.conversationDom) {
       this.conversationDom.destroy();
+      this.conversationDom = null!;
     }
     if (this.styleElement?.parentNode) {
       this.styleElement.parentNode.removeChild(this.styleElement);
+      this.styleElement = undefined;
     }
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();

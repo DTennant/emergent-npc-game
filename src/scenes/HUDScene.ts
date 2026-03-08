@@ -24,6 +24,7 @@ export class HUDScene extends Phaser.Scene {
   private shownHints: Set<string> = new Set();
   private questTrackerText!: Phaser.GameObjects.Text;
   private helpKey!: Phaser.Input.Keyboard.Key;
+  private barHeight = 48;
 
   constructor() {
     super({ key: 'HUDScene' });
@@ -37,6 +38,7 @@ export class HUDScene extends Phaser.Scene {
 
   create(): void {
     const barH = Math.max(48, fsn(34) + 16);
+    this.barHeight = barH;
     const barCenterY = barH / 2;
     const textY = Math.round((barH - fsn(34)) / 2);
 
@@ -59,6 +61,7 @@ export class HUDScene extends Phaser.Scene {
       resolution: window.devicePixelRatio,
     });
     this.dayText.setDepth(101);
+    this.dayText.setX(this.timeText.x + this.timeText.width + 12);
 
     const settingsBtn = this.add.text(GAME_WIDTH - 10, textY, '\u2699\uFE0F', {
       fontSize: fs(42),
@@ -121,6 +124,17 @@ export class HUDScene extends Phaser.Scene {
     this.notificationText.setDepth(101);
     this.notificationText.setVisible(false);
 
+    this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT - 10, 'WASD: Move | E: Talk | I: Inv | C: Craft | T: Trade | H: Help', {
+        fontSize: fs(22),
+        color: '#666666',
+        stroke: '#000000',
+        strokeThickness: 1,
+        resolution: window.devicePixelRatio,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(101);
+
     EventBus.on(Events.SHOW_NOTIFICATION, this.onShowNotification, this);
     EventBus.on(Events.DIALOGUE_START, this.onDialogueStart, this);
     EventBus.on(Events.INVENTORY_CHANGE, this.onInventoryChange, this);
@@ -150,13 +164,11 @@ export class HUDScene extends Phaser.Scene {
     this.timeText.setText(`\uD83D\uDD50 ${this.worldState.getTimeString()}`);
     this.dayText.setText(`\uD83D\uDCC5 Day ${this.worldState.getDay()}`);
     this.dayText.setX(this.timeText.x + this.timeText.width + 12);
-    
-    // Check quest tracker update occasionally if needed, but events are better
+
     if (this.time.now % 1000 < delta) {
-        this.updateQuestTracker();
+      this.updateQuestTracker();
     }
 
-    // Notification fade
     if (this.notificationTimer > 0) {
       this.notificationTimer -= delta;
       if (this.notificationTimer <= 0) {
@@ -250,7 +262,8 @@ export class HUDScene extends Phaser.Scene {
     this.shownHints.add(id);
     localStorage.setItem('hints_shown', JSON.stringify(Array.from(this.shownHints)));
 
-    const hintText = this.add.text(GAME_WIDTH / 2, 70, '\uD83D\uDCA1 ' + message, {
+    const hintY = this.barHeight + 10 + fsn(28);
+    const hintText = this.add.text(GAME_WIDTH / 2, hintY, '\uD83D\uDCA1 ' + message, {
       fontSize: fs(28),
       color: '#ffffff',
       align: 'center',
@@ -260,7 +273,7 @@ export class HUDScene extends Phaser.Scene {
     hintText.setOrigin(0.5);
     hintText.setDepth(151);
 
-    const hintBg = this.add.rectangle(GAME_WIDTH / 2, 70, Math.min(hintText.width + 32, GAME_WIDTH - 40), hintText.height + 16, 0x1a3366, 0.9);
+    const hintBg = this.add.rectangle(GAME_WIDTH / 2, hintY, Math.min(hintText.width + 32, GAME_WIDTH - 40), hintText.height + 16, 0x1a3366, 0.9);
     hintBg.setStrokeStyle(1, 0x4488ff);
     hintBg.setDepth(150);
 
@@ -294,14 +307,6 @@ export class HUDScene extends Phaser.Scene {
     if (!this.worldState) return;
     
     let text = 'Current Objective:\n';
-    const sl = this.worldState.storylineData; // Access raw data if possible, or use manager via world state if available
-    // But WorldState in HUD is just data structure. Let's assume we can infer state or check props.
-    // Actually WorldState class has methods.
-    
-    // We need to check storyline status. 
-    // WorldState doesn't expose StorylineManager directly, but it holds `storylineData`.
-    // We can inspect `this.worldState.storylineData`
-    
     const s = this.worldState.storylineData;
     if (!s) return;
 

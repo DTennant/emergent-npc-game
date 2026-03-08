@@ -13,7 +13,6 @@ import {
   PLAYER_SPEED,
   INTERACTION_DISTANCE,
   fs,
-  fsn,
 } from '../config';
 
 interface BuildingInitData {
@@ -40,7 +39,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
     I: Phaser.Input.Keyboard.Key;
   };
   private escKey!: Phaser.Input.Keyboard.Key;
-  private npc!: NPC;
+  private npc: NPC | null = null;
   private interactionPrompt!: Phaser.GameObjects.Text;
   private roomLabel!: Phaser.GameObjects.Text;
   private notificationText!: Phaser.GameObjects.Text;
@@ -49,6 +48,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
   private inInventory = false;
   private inTrading = false;
   private inCrafting = false;
+  private cleanedUp = false;
   private furnitureGroup!: Phaser.Physics.Arcade.StaticGroup;
   private wallGroup!: Phaser.Physics.Arcade.StaticGroup;
   private playerFacing = 'down';
@@ -71,6 +71,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
 
   create(): void {
     const gs = GameState.get(this);
+    this.cleanedUp = false;
 
     this.cameras.main.setBackgroundColor(this.building.bgColor);
     this.cameras.main.resetFX();
@@ -101,6 +102,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
     this.playerLabel.setOrigin(0.5, 1);
     this.playerLabel.setDepth(11);
 
+    this.npc = null;
     const persona = NPC_PERSONAS.find((p) => p.id === this.building.npcId);
     if (persona) {
       this.npc = new NPC(this, persona);
@@ -139,6 +141,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
       resolution: window.devicePixelRatio,
     });
     this.roomLabel.setDepth(100);
+    this.roomLabel.setScrollFactor(0);
 
     const escLabel = this.add.text(GAME_WIDTH - 10, 10, '[ESC] Exit', {
       fontSize: fs(26),
@@ -149,6 +152,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
     });
     escLabel.setOrigin(1, 0);
     escLabel.setDepth(100);
+    escLabel.setScrollFactor(0);
 
     this.interactionPrompt = this.add.text(0, 0, '', {
       fontSize: fs(26),
@@ -174,9 +178,11 @@ export class BuildingInteriorScene extends Phaser.Scene {
     });
     this.notificationText.setOrigin(0.5);
     this.notificationText.setDepth(100);
+    this.notificationText.setScrollFactor(0);
     this.notificationText.setVisible(false);
 
     EventBus.on(Events.SHOW_NOTIFICATION, this.onShowNotification, this);
+    EventBus.on(Events.DIALOGUE_END, this.onDialogueEnd, this);
 
     this.wasd.E.on('down', () => {
       if (this.inDialogue) return;
@@ -204,24 +210,24 @@ export class BuildingInteriorScene extends Phaser.Scene {
     });
 
     this.input.keyboard!.addKey('T').on('down', () => {
-      if (this.inDialogue || this.inInventory || this.inCrafting) return;
       if (this.inTrading) {
         this.scene.stop('TradeScene');
         this.inTrading = false;
         return;
       }
+      if (this.inDialogue || this.inInventory || this.inCrafting) return;
       if (this.isNearNPC()) {
         this.openTrade();
       }
     });
 
     this.input.keyboard!.addKey('C').on('down', () => {
-      if (this.inDialogue || this.inInventory || this.inTrading) return;
       if (this.inCrafting) {
         this.scene.stop('CraftingScene');
         this.inCrafting = false;
         return;
       }
+      if (this.inDialogue || this.inInventory || this.inTrading) return;
       this.inCrafting = true;
       this.scene.launch('CraftingScene', {
         inventory: gs.inventory,
@@ -238,10 +244,19 @@ export class BuildingInteriorScene extends Phaser.Scene {
     });
 
     EventBus.emit(Events.BUILDING_ENTER, { buildingId: this.building.id });
+
+    this.scene.launch('HUDScene', { worldState: gs.worldState, llmClient: gs.llmClient });
   }
 
   update(_time: number, delta: number): void {
-    if (this.inDialogue || this.inTrading || this.inCrafting) return;
+    const gs = GameState.get(this);
+    gs.worldState.update(delta);
+
+    if (this.npc && !this.inDialogue) {
+      this.npc.update(delta, gs.worldState);
+    }
+
+    if (this.inDialogue || this.inTrading || this.inCrafting || this.inInventory) return;
 
     this.handlePlayerMovement();
     this.checkProximity();
@@ -269,14 +284,23 @@ export class BuildingInteriorScene extends Phaser.Scene {
 
     this.wallGroup = this.physics.add.staticGroup();
     const wallThickness = T;
+    const doorX = this.building.doorPosition.x;
+    const doorY = this.building.doorPosition.y;
+    const doorGap = T * 2;
+    const bottomY = H - wallThickness / 2;
+    const leftWallW = doorX - doorGap / 2;
+    const rightWallW = W - (doorX + doorGap / 2);
+
     const walls = [
       { x: W / 2, y: wallThickness / 2, w: W, h: wallThickness },
-      { x: W / 2, y: H - wallThickness / 2, w: W, h: wallThickness },
+      { x: leftWallW / 2, y: bottomY, w: leftWallW, h: wallThickness },
+      { x: doorX + doorGap / 2 + rightWallW / 2, y: bottomY, w: rightWallW, h: wallThickness },
       { x: wallThickness / 2, y: H / 2, w: wallThickness, h: H },
       { x: W - wallThickness / 2, y: H / 2, w: wallThickness, h: H },
     ];
 
     for (const wall of walls) {
+      if (wall.w <= 0) continue;
       this.add.rectangle(wall.x, wall.y, wall.w, wall.h, this.building.wallColor).setDepth(1);
       const wallBody = this.wallGroup.create(wall.x, wall.y, undefined) as Phaser.Physics.Arcade.Sprite;
       wallBody.setVisible(false);
@@ -285,9 +309,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
       body.setOffset(-wall.w / 2, -wall.h / 2);
     }
 
-    const doorX = this.building.doorPosition.x;
-    const doorY = this.building.doorPosition.y;
-    this.add.rectangle(doorX, H - wallThickness / 2, T * 2, wallThickness, 0x00aa00, 0.4).setDepth(2);
+    this.add.rectangle(doorX, bottomY, doorGap, wallThickness, 0x00aa00, 0.4).setDepth(2);
     const doorLabel = this.add.text(doorX, doorY - T, '[ESC / E] Exit', {
       fontSize: fs(22),
       color: '#88ff88',
@@ -357,7 +379,7 @@ export class BuildingInteriorScene extends Phaser.Scene {
   }
 
   private checkProximity(): void {
-    if (this.isNearNPC()) {
+    if (this.npc && this.isNearNPC()) {
       this.interactionPrompt.setPosition(
         this.npc.sprite.x,
         this.npc.sprite.y - TILE_SIZE * 1.2
@@ -392,27 +414,31 @@ export class BuildingInteriorScene extends Phaser.Scene {
   }
 
   private startDialogue(): void {
+    if (!this.npc) return;
     const gs = GameState.get(this);
+    const npc = this.npc;
     this.inDialogue = true;
-    this.npc.isInDialogue = true;
+    npc.isInDialogue = true;
     this.interactionPrompt.setVisible(false);
+    gs.worldState.pause();
 
     EventBus.emit(Events.DIALOGUE_START, {
-      npc: this.npc,
+      npc,
       llmClient: gs.llmClient,
       worldState: gs.worldState,
     });
 
     this.scene.launch('DialogueScene', {
-      npc: this.npc,
+      npc,
       llmClient: gs.llmClient,
       worldState: gs.worldState,
       storylineManager: gs.storylineManager,
       onClose: () => {
         this.inDialogue = false;
-        this.npc.isInDialogue = false;
+        npc.isInDialogue = false;
+        gs.worldState.resume();
         this.saveNPCState();
-        EventBus.emit(Events.DIALOGUE_END, { npcId: this.npc.persona.id });
+        EventBus.emit(Events.DIALOGUE_END, { npcId: npc.persona.id });
       },
     });
   }
@@ -460,15 +486,20 @@ export class BuildingInteriorScene extends Phaser.Scene {
 
   private exitBuilding(): void {
     this.saveNPCState();
+    this.scene.stop('HUDScene');
     this.cleanup();
     this.cameras.main.fadeOut(300);
     this.time.delayedCall(300, () => {
+      EventBus.emit(Events.BUILDING_EXIT, { buildingId: this.building.id });
       this.scene.start(this.returnScene, {
         spawnX: this.returnX,
         spawnY: this.returnY,
       });
     });
-    EventBus.emit(Events.BUILDING_EXIT, { buildingId: this.building.id });
+  }
+
+  private onDialogueEnd(): void {
+    this.saveNPCState();
   }
 
   private onShowNotification(data: string | { message?: string; text?: string }): void {
@@ -479,7 +510,13 @@ export class BuildingInteriorScene extends Phaser.Scene {
   }
 
   private cleanup(): void {
+    if (this.cleanedUp) return;
+    this.cleanedUp = true;
     EventBus.off(Events.SHOW_NOTIFICATION, this.onShowNotification, this);
+    EventBus.off(Events.DIALOGUE_END, this.onDialogueEnd, this);
+    if (this.npc) {
+      this.npc.destroy();
+    }
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
