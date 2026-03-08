@@ -38,6 +38,12 @@ npx tsc --noEmit     # Type-check only (no output)
 There is **no test framework** configured. No linter or formatter (no ESLint, no Prettier).
 If adding tests, use Vitest (already Vite-based). If adding linting, use ESLint with typescript-eslint.
 
+### Playwright Debugging
+
+When using the Playwright MCP for browser debugging/QA, **always open a new tab first** (`browser_tabs` action `new`) before navigating. The Phaser canvas is not accessible from the default browser context without a fresh tab.
+
+A `__DEBUG__` global object is available in the browser console with helpers like `scenes()`, `enterBuilding(id)`, `tp(x,y)`, `buildings()`, `god()`, etc. Use `browser_evaluate` to call these.
+
 ## Project Structure
 
 ```
