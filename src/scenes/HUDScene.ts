@@ -3,7 +3,7 @@ import { WorldState } from '../world/WorldState';
 import { LLMClient } from '../ai/LLMClient';
 import { ITEMS } from '../inventory/types';
 import { EventBus, Events } from '../world/EventBus';
-import { GAME_WIDTH, GAME_HEIGHT, fs } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT, fs, fsn } from '../config';
 
 interface HUDData {
   worldState: WorldState;
@@ -36,11 +36,13 @@ export class HUDScene extends Phaser.Scene {
   }
 
   create(): void {
-    // HUD background strip
-    this.add.rectangle(GAME_WIDTH / 2, 24, GAME_WIDTH, 48, 0x000000, 0.6).setDepth(100);
+    const barH = Math.max(48, fsn(34) + 16);
+    const barCenterY = barH / 2;
+    const textY = Math.round((barH - fsn(34)) / 2);
 
-    // Time display
-    this.timeText = this.add.text(10, 8, '06:00', {
+    this.add.rectangle(GAME_WIDTH / 2, barCenterY, GAME_WIDTH, barH, 0x000000, 0.6).setDepth(100);
+
+    this.timeText = this.add.text(10, textY, '06:00', {
       fontSize: fs(34),
       color: '#ffcc00',
       stroke: '#000000',
@@ -49,8 +51,7 @@ export class HUDScene extends Phaser.Scene {
     });
     this.timeText.setDepth(101);
 
-    // Day display
-    this.dayText = this.add.text(90, 8, 'Day 1', {
+    this.dayText = this.add.text(0, textY, 'Day 1', {
       fontSize: fs(34),
       color: '#ffffff',
       stroke: '#000000',
@@ -59,69 +60,11 @@ export class HUDScene extends Phaser.Scene {
     });
     this.dayText.setDepth(101);
 
-    // Quest Tracker
-    this.questTrackerText = this.add.text(GAME_WIDTH - 120, 40, '', {
-      fontSize: fs(24),
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 2,
-      align: 'right',
-      wordWrap: { width: 220 },
-      resolution: window.devicePixelRatio,
-    });
-    this.questTrackerText.setOrigin(1, 0);
-    this.questTrackerText.setDepth(101);
-    this.updateQuestTracker();
-
-    // API status
-    const hasApi = this.llmClient.hasApiKey();
-    this.apiStatus = this.add.text(GAME_WIDTH - 50, 8, hasApi ? '🟢 LLM' : '🟡 Fallback', {
-      fontSize: fs(26),
-      color: hasApi ? '#44ff44' : '#ffaa00',
-      stroke: '#000000',
-      strokeThickness: 2,
-      resolution: window.devicePixelRatio,
-    });
-    this.apiStatus.setOrigin(1, 0);
-    this.apiStatus.setDepth(101);
-
-    this.add
-      .text(GAME_WIDTH / 2, 8, 'WASD: Move | E: Talk | I: Inv | C: Craft | T: Trade | ESC: Close', {
-        fontSize: fs(26),
-        color: '#cccccc',
-        stroke: '#000000',
-        strokeThickness: 2,
-        resolution: window.devicePixelRatio,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(101);
-
-    this.equippedWeaponText = this.add.text(10, GAME_HEIGHT - 30, 'Weapon: (none)', {
-      fontSize: fs(30),
-      color: '#aaaaaa',
-      stroke: '#000000',
-      strokeThickness: 2,
-      resolution: window.devicePixelRatio,
-    }).setDepth(101);
-
-    // Notification area
-    this.notificationText = this.add.text(GAME_WIDTH / 2, 40, '', {
-      fontSize: fs(28),
-      color: '#44ff88',
-      stroke: '#000000',
-      strokeThickness: 2,
-      backgroundColor: '#00000088',
-      padding: { x: 16, y: 8 },
-      resolution: window.devicePixelRatio,
-    });
-    this.notificationText.setOrigin(0.5);
-    this.notificationText.setDepth(101);
-    this.notificationText.setVisible(false);
-
-    const settingsBtn = this.add.text(GAME_WIDTH - 30, 6, '⚙️', {
+    const settingsBtn = this.add.text(GAME_WIDTH - 10, textY, '\u2699\uFE0F', {
       fontSize: fs(42),
       resolution: window.devicePixelRatio,
     });
+    settingsBtn.setOrigin(1, 0);
     settingsBtn.setDepth(101);
     settingsBtn.setInteractive({ useHandCursor: true });
     settingsBtn.on('pointerdown', () => {
@@ -131,6 +74,52 @@ export class HUDScene extends Phaser.Scene {
     });
     settingsBtn.on('pointerover', () => settingsBtn.setScale(1.1));
     settingsBtn.on('pointerout', () => settingsBtn.setScale(1));
+
+    const hasApi = this.llmClient.hasApiKey();
+    this.apiStatus = this.add.text(settingsBtn.x - settingsBtn.width - 8, textY, hasApi ? '\uD83D\uDFE2 LLM' : '\uD83D\uDFE1 Fallback', {
+      fontSize: fs(26),
+      color: hasApi ? '#44ff44' : '#ffaa00',
+      stroke: '#000000',
+      strokeThickness: 2,
+      resolution: window.devicePixelRatio,
+    });
+    this.apiStatus.setOrigin(1, 0);
+    this.apiStatus.setDepth(101);
+
+    this.questTrackerText = this.add.text(GAME_WIDTH - 10, barH + 4, '', {
+      fontSize: fs(24),
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 2,
+      align: 'right',
+      wordWrap: { width: 260 },
+      resolution: window.devicePixelRatio,
+    });
+    this.questTrackerText.setOrigin(1, 0);
+    this.questTrackerText.setDepth(101);
+    this.updateQuestTracker();
+
+    this.equippedWeaponText = this.add.text(10, GAME_HEIGHT - fsn(30) - 8, 'Weapon: (none)', {
+      fontSize: fs(30),
+      color: '#aaaaaa',
+      stroke: '#000000',
+      strokeThickness: 2,
+      resolution: window.devicePixelRatio,
+    }).setDepth(101);
+
+    this.notificationText = this.add.text(GAME_WIDTH / 2, barH + 4, '', {
+      fontSize: fs(28),
+      color: '#44ff88',
+      stroke: '#000000',
+      strokeThickness: 2,
+      backgroundColor: '#00000088',
+      padding: { x: 16, y: 8 },
+      wordWrap: { width: GAME_WIDTH * 0.7 },
+      resolution: window.devicePixelRatio,
+    });
+    this.notificationText.setOrigin(0.5, 0);
+    this.notificationText.setDepth(101);
+    this.notificationText.setVisible(false);
 
     EventBus.on(Events.SHOW_NOTIFICATION, this.onShowNotification, this);
     EventBus.on(Events.DIALOGUE_START, this.onDialogueStart, this);
@@ -158,9 +147,9 @@ export class HUDScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    // Update time display
-    this.timeText.setText(`🕐 ${this.worldState.getTimeString()}`);
-    this.dayText.setText(`📅 Day ${this.worldState.getDay()}`);
+    this.timeText.setText(`\uD83D\uDD50 ${this.worldState.getTimeString()}`);
+    this.dayText.setText(`\uD83D\uDCC5 Day ${this.worldState.getDay()}`);
+    this.dayText.setX(this.timeText.x + this.timeText.width + 12);
     
     // Check quest tracker update occasionally if needed, but events are better
     if (this.time.now % 1000 < delta) {
@@ -261,18 +250,19 @@ export class HUDScene extends Phaser.Scene {
     this.shownHints.add(id);
     localStorage.setItem('hints_shown', JSON.stringify(Array.from(this.shownHints)));
 
-    const hintBg = this.add.rectangle(GAME_WIDTH / 2, 70, 500, 64, 0x1a3366, 0.9);
-    hintBg.setStrokeStyle(1, 0x4488ff);
-    hintBg.setDepth(150);
-
-    const hintText = this.add.text(GAME_WIDTH / 2, 70, '💡 ' + message, {
+    const hintText = this.add.text(GAME_WIDTH / 2, 70, '\uD83D\uDCA1 ' + message, {
       fontSize: fs(28),
       color: '#ffffff',
       align: 'center',
+      wordWrap: { width: GAME_WIDTH * 0.6 },
       resolution: window.devicePixelRatio,
     });
     hintText.setOrigin(0.5);
     hintText.setDepth(151);
+
+    const hintBg = this.add.rectangle(GAME_WIDTH / 2, 70, Math.min(hintText.width + 32, GAME_WIDTH - 40), hintText.height + 16, 0x1a3366, 0.9);
+    hintBg.setStrokeStyle(1, 0x4488ff);
+    hintBg.setDepth(150);
 
     this.tweens.add({
       targets: [hintBg, hintText],
@@ -379,10 +369,12 @@ export class HUDScene extends Phaser.Scene {
       resolution: window.devicePixelRatio,
     };
     
+    const colWidth = GAME_WIDTH * 0.35;
     const bodyStyle = {
       fontSize: fs(28),
       color: '#ffffff',
       lineSpacing: 6,
+      wordWrap: { width: colWidth },
       resolution: window.devicePixelRatio,
     };
 
@@ -391,6 +383,7 @@ export class HUDScene extends Phaser.Scene {
       color: '#cccccc',
       lineSpacing: 4,
       fontStyle: 'italic' as const,
+      wordWrap: { width: colWidth },
       resolution: window.devicePixelRatio,
     };
 
